@@ -1,6 +1,6 @@
 # An OCaml Matrix Library
 
-Purely symbolic matrix manipulation suite comprised of **45 operators** for matrix (OCaml `array`) creation, manipulation and calculation—mostly translations of Array library functions with some interesting additions. Will likely continue to grow as it's used.
+Purely symbolic matrix manipulation suite comprised of **50 operators** for matrix (OCaml `array`) creation, manipulation and calculation—mostly translations of Array library functions with some interesting additions. Will likely continue to grow as it's used.
 
 
 
@@ -25,70 +25,75 @@ It appears incomprehensible at first but you may find that there's some method t
 ``` ocaml
 module Matlib : sig
 
-  type vector = float array   
-  type matrix = vector array                            
+  type vector = float array                         (* not polymorphic... TODO *)
+  type matrix = vector array                        (* one of these days *)
 
-  val ( ~|+  ) : 'a list -> 'a array              (* transform list to array *)
-  val ( ~|-  ) : 'a array -> 'a list              (* transform array to list *)
+  val ( ~|+  ) : 'a list -> 'a array                (* transform list to array *)
+  val ( ~|-  ) : 'a array -> 'a list                (* transform array to list *)
+  val ( ~|++ ) : float list list -> matrix          (* transform list list to matrix *)
+  val ( ~|-- ) : matrix -> float list list          (* transform matrix to list list *)
 
-  val ( ~.   ) : vector -> vector                 (* get copy a vector *)
-  val ( ~..  ) : matrix -> matrix                 (* get copy a matrix *)
+  val ( ~.   ) : vector -> vector                   (* get copy a vector *)
+  val ( ~..  ) : matrix -> matrix                   (* get copy a matrix *)
+
+  val ( ~||  ) : 'a array -> int                    (* get length of v, or #rows of m *)
+  val ( ~||| ) : matrix -> int * int                (* get (r,c) size of matrix *)
+  val ( ~||? ) : matrix -> bool                     (* rectangular matrix test *)
+  val ( ~|||?) : matrix -> bool                     (* square matrix test *)
 
   val ( >~<  ) : 'a array -> 'b array -> ('a * 'b) array  (* zip arrays to tupled array *)
 
-  val ( ~||  ) : 'a array -> int                  (* get length of vector, or #rows of matrix *)
-  val ( ~||| ) : matrix -> int * int              (* get (r,c) size of matrix *)
-  
-  val ( |.   ) : vector -> int * float -> unit    (* mutable: modify index in vector *)
-  val ( |..  ) : matrix -> int * int * float -> unit      (* mutable: modify index in matrix *)
+  val ( |.   ) : vector -> int * float -> unit      (* mutable: modify index in vector *)
+  val ( |..  ) : matrix -> int * int * float -> unit(* mutable: modify index in matrix *)
   val ( |... ) : matrix -> (int*int*float) list -> unit   (* mutable: modify many indices *)
+
+  val ( |*|  ) : int -> 'a -> 'a array              (* create vector *)
+  val ( |**| ) : int * int -> float -> matrix       (* create matrix *)
+  val ( ~|**|) : int -> matrix                      (* create identity matrix of size *)
+
+  val ( ^-|  ) : 'a array -> int -> 'a array        (* remove el from v, or row from m *)
+  val ( ^--| ) : 'a array -> int -> 'a array            (* remove n head elements *)
+  val ( @-|  ) : matrix -> int -> matrix            (* remove col from matrix *)
+  val ( @--| ) : matrix -> int * int -> matrix      (* remove row,col from matrix *)
   
-  val ( |*|  ) : int -> float -> vector           (* create vector *)
-  val ( |**| ) : int * int -> float -> matrix     (* create matrix *)
-  val ( ~|**|) : int -> matrix                    (* create identity matrix of size *)
+  val ( @><| ) : matrix -> int * int -> matrix      (* swap rows in matrix *)
+  val ( @>.<|) : matrix -> int * int -> unit        (* mutable: swap rows in matrix *)
+
+  val ( ^::^ ) : vector -> vector -> vector         (* horizontally join vectors *)
+  val ( ^::@ ) : vector -> matrix -> matrix         (* add row to top of matrix *)
+  val ( >::@ ) : vector -> matrix -> matrix         (* add column to front of matrix *)
+  val ( @::^ ) : matrix -> vector -> matrix         (* add row to bottom of matrix *)
+  val ( @::< ) : matrix -> vector -> matrix         (* add column to right of matrix *)
+  val ( @::@ ) : matrix -> matrix -> matrix         (* horizontally join matrices *)
   
-  val ( |-|  ) : vector -> int -> vector          (* remove n head elements *)
-  val ( |-^  ) : int -> 'a array -> 'a array      (* remove index from v, or remove row from m *)
-  val ( |-@  ) : int * int -> matrix -> matrix    (* remove row,col from matrix *)
+  val ( |*^  ) : float -> vector -> vector          (* scale vector *)
+  val ( |*@  ) : float -> matrix -> matrix          (* scale matrix *)  
+  val ( ^*^  ) : vector -> vector -> float          (* v * v *)
+  val ( ^+^  ) : vector -> vector -> vector         (* v + v *)
+  val ( ^-^  ) : vector -> vector -> vector         (* v - v *)
+  val ( ^=^  ) : vector -> vector -> bool           (* vector equality *)
+  val ( @*^  ) : matrix -> vector -> vector         (* m * v *)
+  val ( @*@  ) : matrix -> matrix -> matrix         (* m * m *)
+  val ( @+@  ) : matrix -> matrix -> matrix         (* m - m *)
+  val ( @-@  ) : matrix -> matrix -> matrix         (* m - m *)
+  val ( @/@  ) : matrix -> matrix -> matrix         (* (m^-1) * m *)
+  val ( @=@  ) : matrix -> matrix -> bool           (* matrix equality *)
+  val ( @^|  ) : matrix -> int -> matrix            (* matrix exponent *)
 
-  val ( @><| ) : matrix -> int * int -> matrix    (* swap rows in matrix *)
-  val ( @>.<|) : matrix -> int * int -> unit      (* mutable: swap rows in matrix *)
+  val ( !|   ) : matrix -> float                    (* determinant *)
+  val ( !^   ) : matrix -> float                    (* trace *) 
+  val ( !~   ) : matrix -> matrix                   (* transpose *)
+  val ( !??  ) : matrix -> bool                     (* intertability test *)
+  val ( !?   ) : matrix -> matrix                   (* invert matrix *)
+  val ( ~@@  ) : matrix -> matrix                   (* mutable: gaussian elimination *)
 
-  val ( ^::^ ) : vector -> vector -> vector       (* horizontally join vectors *)
-  val ( ^::@ ) : vector -> matrix -> matrix       (* add row to top of matrix *)
-  val ( >::@ ) : vector -> matrix -> matrix       (* add column to front of matrix *)
-  val ( @::^ ) : matrix -> vector -> matrix       (* add row to bottom of matrix *)
-  val ( @::< ) : matrix -> vector -> matrix       (* add column to right of matrix *)
-  val ( @::@ ) : matrix -> matrix -> matrix       (* horizontally join matrices *)
-  
-  val ( |*^  ) : float -> vector -> vector        (* scale vector *)
-  val ( |*@  ) : float -> matrix -> matrix        (* scale matrix *)  
-  val ( ^*^  ) : vector -> vector -> float        (* v * v *)
-  val ( ^+^  ) : vector -> vector -> vector       (* v + v *)
-  val ( ^-^  ) : vector -> vector -> vector       (* v - v *)
-  val ( ^=^  ) : vector -> vector -> bool         (* vector equality *)
-  val ( @*^  ) : matrix -> vector -> vector       (* m * v *)
-  val ( @*@  ) : matrix -> matrix -> matrix       (* m * m *)
-  val ( @+@  ) : matrix -> matrix -> matrix       (* m - m *)
-  val ( @-@  ) : matrix -> matrix -> matrix       (* m - m *)
-  val ( @/@  ) : matrix -> matrix -> matrix       (* (m^-1) * m *)
-  val ( @=@  ) : matrix -> matrix -> bool         (* matrix equality *)
-  val ( @^|  ) : matrix -> int -> matrix          (* matrix exponent *)
-
-  val ( !|   ) : matrix -> float                  (* determinant *)
-  val ( !^   ) : matrix -> float                  (* trace *) 
-  val ( !~   ) : matrix -> matrix                 (* transpose *)
-  val ( !??  ) : matrix -> bool                   (* intertability test *)
-  val ( !?   ) : matrix -> matrix                 (* invert matrix *)
-  val ( ~@@  ) : matrix -> matrix                 (* mutable: gaussian elimination *)
-
-  val ( ~^>  ) : vector -> unit                   (* print vector *)
-  val ( ~@>  ) : matrix -> unit                   (* print matrix *)
+  val ( ~^>  ) : vector -> unit                     (* print vector *)
+  val ( ~@>  ) : matrix -> unit                     (* print matrix *)
 
 end
 ```
 
-----
+---
 
 #### Implementation
 

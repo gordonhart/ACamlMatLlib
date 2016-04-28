@@ -1,8 +1,8 @@
 
-#use "matlib.ml";;
-open Matlib;;
+#use "acamlmatlib.ml";;
+open ACamlMatLib;;
 
-(* #use "fileio.ml";; *)
+#use "testers/fileio.ml";;
 
 
 type point = float * float;;
@@ -58,7 +58,7 @@ let least_squares
 let example_curve = fun x -> if x <= 1. then 0. else (((100./.x) *.(sin x))) -. x;;
 let xrange = (1.05,10.);;
 let error = 1.;;
-let numpoints = 10000;;
+let numpoints = 100000;;
 
 let points = randomized_curve example_curve xrange error numpoints;;
 
@@ -85,7 +85,7 @@ let lsq_func_points = fx_over_time lsq_function xrange 0.05;;
 let example_points = fx_over_time example_curve xrange 0.05;;
 
 
-(* "lsq_points.dat"||<..lsq_func_points;;
+"lsq_points.dat"||<..lsq_func_points;;
 "lsq_randpoints.dat"||<..points;;
-"lsq_realpoints.dat"||<..example_points;; *)
+"lsq_realpoints.dat"||<..example_points;;
 
