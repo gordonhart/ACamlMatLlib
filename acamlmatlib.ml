@@ -31,7 +31,7 @@
 
 
 
-module Camlmatlib : sig
+module Matlib : sig
 
   type vector = float array                               (* not polymorphic... TODO *)
   type matrix = vector array                              (* one of these days *)
