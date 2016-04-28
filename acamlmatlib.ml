@@ -2,7 +2,7 @@
 (* ======================================================================================== *)
 (*                                                                                          *)
 (*            ------- AN OCAML MATRIX LIBRARY ---------------------                         *)
-(*            ------- Matrix Calculations and Manipulation --------                         *)
+(*            ------- Calculations and Manipulation of Matrices ---                         *)
 (*            ------- Gordon Hart, 2016 ---------------------------                         *)
 (*                                                                                          *)
 (*    Purely symbolic matrix manipulation suite.                                            *)
@@ -67,7 +67,7 @@ module Matlib : sig
   val ( @::@ ) : matrix -> matrix -> matrix               (* horizontally join matrices *)
   
   val ( |><| ) : matrix -> int * int -> matrix            (* swap rows in matrix *)
-  val ( |>.<|) : matrix -> int * int -> unit            (* mutable: swap rows in matrix *)
+  val ( |>.<|) : matrix -> int * int -> unit              (* mutable: swap rows in matrix *)
   
   val ( |*^  ) : float -> vector -> vector                (* scale vector *)
   val ( |*@  ) : float -> matrix -> matrix                (* scale matrix *)  
