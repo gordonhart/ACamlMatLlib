@@ -33,8 +33,8 @@
 
 module ACamlMatLib : sig
 
-  type vector = float array                               (* not polymorphic... TODO *)
-  type matrix = vector array                              (* one of these days *)
+  type vector = float array         
+  type matrix = vector array  
 
   val ( ~|+  ) : 'a list -> 'a array                      (* transform list to array *)
   val ( ~|-  ) : 'a array -> 'a list                      (* transform array to list *)
@@ -51,19 +51,19 @@ module ACamlMatLib : sig
 
   val ( >~<  ) : 'a array -> 'b array -> ('a * 'b) array  (* zip arrays to tupled array *)
 
-  val ( |.   ) : vector -> int * float -> unit            (* mutable: modify index in vector *)
-  val ( |..  ) : matrix -> int * int * float -> unit      (* mutable: modify index in matrix *)
-  val ( |... ) : matrix -> (int*int*float) list -> unit   (* mutable: modify many indices *)
+  val ( ^..  ) : vector -> int * float -> unit            (* mutable: modify index in vector *)
+  val ( ^... ) : vector -> (int * float) list -> unit     (* mutable: modify many vector els *)
+  val ( @..  ) : matrix -> int * int * float -> unit      (* mutable: modify index in matrix *)
+  val ( @... ) : matrix -> (int*int*float) list -> unit   (* mutable: modify many els in mat *)
 
   val ( |*|  ) : int -> 'a -> 'a array                    (* create vector *)
   val ( |**| ) : int * int -> float -> matrix             (* create matrix *)
   val ( ~|**|) : int -> matrix                            (* create identity matrix of size *)
 
   val ( ^-|  ) : 'a array -> int -> 'a array              (* remove el from v, or row from m *)
-  val ( ^--| ) : 'a array -> int -> 'a array                  (* remove n head elements *)
+  val ( ^--| ) : 'a array -> int -> 'a array              (* remove n head elements *)
   val ( @-|  ) : matrix -> int -> matrix                  (* remove col from matrix *)
   val ( @--| ) : matrix -> int * int -> matrix            (* remove row,col from matrix *)
-  
   val ( @><| ) : matrix -> int * int -> matrix            (* swap rows in matrix *)
   val ( @>.<|) : matrix -> int * int -> unit              (* mutable: swap rows in matrix *)
 
@@ -93,14 +93,14 @@ module ACamlMatLib : sig
   val ( !~   ) : matrix -> matrix                         (* transpose *)
   val ( !??  ) : matrix -> bool                           (* intertability test *)
   val ( !?   ) : matrix -> matrix                         (* invert matrix *)
-  val ( ~@@  ) : matrix -> matrix                         (* mutable: gaussian elimination *)
+  val ( !@@  ) : matrix -> matrix                         (* mutable: gaussian elimination *)
 
   val ( ~^>  ) : vector -> unit                           (* print vector *)
   val ( ~@>  ) : matrix -> unit                           (* print matrix *)
 
 end = struct
 
-  type vector = float array
+  type vector = float array (* maybe make this polymorphic later *)
   type matrix = vector array
 
   let zero = 0. and one = 1. 
@@ -130,8 +130,7 @@ end = struct
   let (~|+) v : 'a array = Array.of_list v (* create array from list *)
   let (~|-) v : 'a list = Array.to_list v (* create list from array *)
   let (~|++) ll : matrix = let m = ~|+ (List.map (~|+) ll) in
-    if (~||? m) then m (* only return if square *)
-    else raise (Logical_Error "creation of matrix from lists: not rectangular")
+    if (~||? m) then m else raise (Logical_Error "in ~|++ : input not rectangular")
   let (~|--) m : float list list = ~|- (Array.map (~|-) m)
 
   (* create FRESH copies of vectors/matrices *)
@@ -141,9 +140,10 @@ end = struct
 
   (* MUTABLE setters -- just an alias to a nicer setting notation *)
   (* tupling is so much nicer for many args--no bullshit about parenthesizing *)
-  let (|.) v (i,vlu) : unit = v.(i) <- vlu (* shorthlet setting notation *)
-  let (|..) m (r,c,vlu) : unit = m.(r).(c) <- vlu  (* set 2d matrix *)
-  let (|...) m changes : unit = List.iter (fun (r,c,vlu) -> m|..(r,c,vlu)) changes
+  let (^..) v (i,vlu) : unit = v.(i) <- vlu (* shorthlet setting notation *)
+  let (^...) v changes : unit = List.iter (fun (i,vlu) -> v^..(i,vlu)) changes
+  let (@..) m (r,c,vlu) : unit = m.(r).(c) <- vlu  (* set 2d matrix *)
+  let (@...) m changes : unit = List.iter (fun (r,c,vlu) -> m@..(r,c,vlu)) changes
 
   (* zip two arrays into a single tupled array *)
   let (>~<) v1 v2 : ('a * 'b) array = 
@@ -155,8 +155,8 @@ end = struct
     let remove_index ind vec = 
       let inc = ref (-1) in let inc_is loc = inc := !inc + 1; !inc = loc in
       Array.fold_left (fun a x -> if inc_is ind then a else Array.append a [|x|]) [||] vec
-    in try if (i <= (~|| v)) then remove_index i v else raise (Out_of_Bounds "in |-^") with
-    | Out_of_Bounds(e) -> printf "i: %d\n||v||: %d\n" i (~||v); raise (Out_of_Bounds e)
+    in try if (i < (~|| v)) then remove_index i v else raise (Out_of_Bounds "in |-^") with
+    | Out_of_Bounds e -> printf "i: %d\n||v||: %d\n" i (~||v); raise (Out_of_Bounds e)
     | _ -> raise (Undefined_Error "in |-^ : couldn't remove index from vector")
 
   (* cut off n elements from the front of vector *)
@@ -186,7 +186,7 @@ end = struct
 
   let (~|**|) n : matrix = (* identity matrix of size [ n x n ] *)
     let identitymat size =
-      Array.mapi (fun i row -> row|.(i,one); row) ((size,size)|**|zero) in
+      Array.mapi (fun i row -> row^..(i,one); row) ((size,size)|**|zero) in
     try identitymat n with _ -> raise (Undefined_Error "couldn't create identity matrix")
 
   (* immutable vector/matrix modification operators *)
@@ -215,18 +215,18 @@ end = struct
     with _ -> raise (Undefined_Error "couldn't append matrices")
 
   (* aux function used for the mutable and immutable swap *)
-  let swap_rows mat (a,b) = let temp = mat.(a) in (mat|.(a,mat.(b))); (mat|.(b,temp))
+  let swap_rows mat (a,b) = let temp = mat.(a) in (mat^..(a,mat.(b))); (mat^..(b,temp))
 
   (* immutable swap two rows in matrix, return fresh matrix *)
   let (@><|) m (r1,r2) : matrix = 
     try let mat = ~.. m in swap_rows mat (r1,r2); mat with 
-    | Invalid_argument(a) -> raise (Out_of_Bounds "in @><|")
+    | Invalid_argument n -> raise (Out_of_Bounds "in @><|")
     | _ -> raise (Undefined_Error "in @><|")
 
   (* mutable swap rows *)
   let (@>.<|) m (r1,r2) : unit = 
     try swap_rows m (r1,r2) with 
-    | Invalid_argument(a) -> raise (Out_of_Bounds "in @>.<|")
+    | Invalid_argument n -> raise (Out_of_Bounds "in @>.<|")
     | _ -> raise (Undefined_Error "in @>.<|")
 
   (* print a vector/matrix *)
@@ -255,7 +255,7 @@ end = struct
     let rec det = function
       | [||] -> zero
       | [| [| el |] |] -> el (* base case single element matrix *)
-      | rows when not (~|||?rows) -> raise (Not_Square "in !| (determinant")
+      | rows when not (~|||? rows) -> raise (Not_Square "in !| (determinant")
       | rows -> (* else full matrix, apply pattern let recur *)
           let ans = Array.mapi (fun ci el -> 
             (if (ci mod 2)=1 then (zero &- el) else el) &* (det (rows @--| (0,ci)))
@@ -282,7 +282,7 @@ end = struct
   (* inverse of a matrix *)
   and (!?) m : matrix = 
     let inverse mat = (* map identity matrix to rhs of m let reduce, rhs is inverse *)
-      let n = ~||mat in Array.map (fun r -> r^--|n) (~@@ (mat @::@ (~|**|n)))
+      let n = ~||mat in Array.map (fun r -> r^--|n) (!@@ (mat @::@ (~|**|n)))
     in try inverse m with _ -> raise (Singular_Matrix "in !? : not invertible")
 
 
@@ -358,7 +358,7 @@ end = struct
 
   (* gaussian elimination: transform a matrix to reduced row echelon form *)
   (* ugly for loops but it's really the best way to deal with matrices, sorry ocaml *)
-  and (~@@) m : matrix = 
+  and (!@@) m : matrix = 
     let rref mat = 
       let a = ref (~.. mat) in (* reference to the matrix being modified *)
 
@@ -381,8 +381,8 @@ end = struct
           let mult = ((!a).(i).(k)) /. ((!a).(k).(k)) in
           if i<>k then (
             for j = k+1 to (m - 1) do 
-              (!a)|..(i,j,(!a).(i).(j) &- (mult&*((!a).(k).(j))))
-            done; (!a)|..(i,k,zero))
+              (!a)@..(i,j,(!a).(i).(j) &- (mult&*((!a).(k).(j))))
+            done; (!a)@..(i,k,zero))
         ) done;
       ) done; !a 
     in try rref m with

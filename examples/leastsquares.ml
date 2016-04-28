@@ -2,7 +2,8 @@
 #use "acamlmatlib.ml";;
 open ACamlMatLib;;
 
-#use "testers/fileio.ml";;
+(* maybe I'll include this sometime later *)
+(* #use "testers/fileio.ml";; *)
 
 
 type point = float * float;;
@@ -62,7 +63,7 @@ let numpoints = 100000;;
 
 let points = randomized_curve example_curve xrange error numpoints;;
 
-(* let realpoints = fx  *)
+
 
 (* take least squares fit using the cubic polynomial *)
 let polyx0 = fun x -> 1.;;
@@ -77,6 +78,8 @@ let yp = List.map (fun (x,y) -> y) points;;
 
 let lsq_params = least_squares basisfuns xp yp;;
 
+
+
 (* make a function out of the parameters obtained from the lease squares fit *)
 let lsq_function = 
 	basisfx (~|- (Array.map (fun (p,f) -> fun x -> p*.(f x)) (lsq_params >~< (~|+ basisfuns))));;
@@ -85,7 +88,7 @@ let lsq_func_points = fx_over_time lsq_function xrange 0.05;;
 let example_points = fx_over_time example_curve xrange 0.05;;
 
 
-"lsq_points.dat"||<..lsq_func_points;;
+(* "lsq_points.dat"||<..lsq_func_points;;
 "lsq_randpoints.dat"||<..points;;
-"lsq_realpoints.dat"||<..example_points;;
+"lsq_realpoints.dat"||<..example_points;; *)
 
