@@ -8,7 +8,7 @@
 (*    Purely symbolic matrix manipulation suite.                                            *)
 (*      EVERYTHING is immutable unless explicitly stated otherwise!                         *)
 (*                                                                                          *)
-(*    There are 45 operators--this library should be comprehensible after reading           *)
+(*    There are 45 operators--should be comprehensible after reading                        *)
 (*      through the signature for a few minutes.                                            *)
 (*                                                                                          *)
 (*    In general, the leftmost char of an operator signals the associativity/left           *)
@@ -31,7 +31,7 @@
 
 
 
-module Matlib : sig
+module ACamlMatLib : sig
 
   type vector = float array                               (* not polymorphic... TODO *)
   type matrix = vector array                              (* one of these days *)
@@ -59,15 +59,15 @@ module Matlib : sig
   val ( |-^  ) : int -> 'a array -> 'a array              (* remove index from v, or remove row from m *)
   val ( |-@  ) : int * int -> matrix -> matrix            (* remove row,col from matrix *)
   
+  val ( @><| ) : matrix -> int * int -> matrix            (* swap rows in matrix *)
+  val ( @>.<|) : matrix -> int * int -> unit              (* mutable: swap rows in matrix *)
+
   val ( ^::^ ) : vector -> vector -> vector               (* horizontally join vectors *)
   val ( ^::@ ) : vector -> matrix -> matrix               (* add row to top of matrix *)
   val ( >::@ ) : vector -> matrix -> matrix               (* add column to front of matrix *)
   val ( @::^ ) : matrix -> vector -> matrix               (* add row to bottom of matrix *)
   val ( @::< ) : matrix -> vector -> matrix               (* add column to right of matrix *)
   val ( @::@ ) : matrix -> matrix -> matrix               (* horizontally join matrices *)
-  
-  val ( |><| ) : matrix -> int * int -> matrix            (* swap rows in matrix *)
-  val ( |>.<|) : matrix -> int * int -> unit              (* mutable: swap rows in matrix *)
   
   val ( |*^  ) : float -> vector -> vector                (* scale vector *)
   val ( |*@  ) : float -> matrix -> matrix                (* scale matrix *)  
@@ -107,6 +107,12 @@ end = struct
   and (&* ) a b = a*.b
   and (&/) a b = a/.b
 
+  exception Not_Square of string
+  exception Out_of_Bounds of string
+  exception Undefined_Error of string
+  exception Dimension_Mismatch of string
+  exception Singular_Matrix of string
+
   (* MANIPULATION DEFINITIONS *)
   (* to make arrays less annoying to work with *)
   let (~|+) v : 'a array = Array.of_list v (* create array from list *)
@@ -127,8 +133,8 @@ end = struct
 
   (* zip two arrays into a single tupled array *)
   let (>~<) v1 v2 : ('a * 'b) array = 
-    try Array.mapi (fun i x -> (x,v2.(i))) v1 
-    with _ -> failwith "mismatch zip"
+    if ((~||v1)=(~||v2)) then Array.mapi (fun i x -> (x,v2.(i))) v1 
+    else raise (Dimension_Mismatch "in >~<")
 
   (* remove an index from 'a array, return shorter version *)
   let (|-^) ind vec : 'a array = (* VERY SLOW *)
@@ -138,74 +144,78 @@ end = struct
   (* remove and return matrix without a certain row,column *)
   let (|-@) (ri,ci) m = 
     try Array.map (fun row -> ci|-^row) (ri|-^m)
-    with _ -> failwith "couldn't remove row and col from matrix"
+    with _ -> raise (Undefined_Error "couldn't remove row and col from matrix")
 
   (* cut off n elements from the front of vector *)
   let (|-|) v n : vector = (* a|-|1 is effectively a call to the tail of the vector *)
     try Array.sub v n ((~|| v) - n) 
-    with _ -> failwith "couldn't remove elements from vector"
+    with _ -> raise (Undefined_Error "couldn't remove elements from vector")
 
   (* vector/matrix creation symbols *)
   let (|*|) s v : vector = (* init array of size s with values v *)
     let makevec size vlu = Array.init size (fun x -> vlu) in
-    try makevec s v with _ -> failwith "couldn't create vector"
+    try makevec s v with _ -> raise (Undefined_Error "couldn't create vector")
 
   let (|**|) (r,c) v : matrix = 
     let makemat (rows,cols) vec = 
       Array.map (fun r -> Array.make cols vec) (Array.make rows None) 
-    in try makemat (r,c) v with _ -> failwith "couldn't create matrix"
+    in try makemat (r,c) v with _ -> raise (Undefined_Error "couldn't create matrix")
 
   let (~|**|) n : matrix = (* identity matrix of size [ n x n ] *)
     let identitymat size =
       Array.mapi (fun i row -> row|.(i,one); row) ((size,size)|**|zero) in
-    try identitymat n with _ -> failwith "couldn't create identity matrix"
+    try identitymat n with _ -> raise (Undefined_Error "couldn't create identity matrix")
 
   (* immutable vector/matrix modification operators *)
   let (^::^) v1 v2 : vector = 
     try Array.append v1 v2 (* array append infix operator *)
-    with _ -> failwith "couldn't append vector"
+    with _ -> raise (Undefined_Error "couldn't append vector")
 
   let (^::@) v m : matrix = (* add row to top of matrix *)
     try Array.append [|v|] m 
-    with _ -> failwith "couldn't add row to matrix"
+    with _ -> raise (Undefined_Error "couldn't add row to matrix")
   
   let (>::@) v m : matrix = (* add col to front of matrix *)
     try Array.map (fun (row,el) -> Array.append [|el|] row) (m >~< v) 
-    with _ -> failwith "couldn't add column to matrix"
+    with _ -> raise (Undefined_Error "couldn't add column to matrix")
 
   let (@::^) m v : matrix = (* add row to bottom of matrix *)
     try Array.append m [|v|]
-    with _ -> failwith "couldn't add row to matrix"
+    with _ -> raise (Undefined_Error "couldn't add row to matrix")
 
   let (@::<) m v : matrix = (* add col to end of matrix *)
     try Array.map (fun (row,el) -> Array.append row [|el|]) (m >~< v) 
-    with _ -> failwith "couldn't add column to matrix"
+    with _ -> raise (Undefined_Error "couldn't add column to matrix")
 
   let (@::@) m1 m2 : matrix = (* horizontally concatenate two matrices *)
     try Array.map (fun (r1,r2) -> r1 ^::^ r2) (m1 >~< m2) 
-    with _ -> failwith "couldn't append matrices"
+    with _ -> raise (Undefined_Error "couldn't append matrices")
 
   (* aux function used for the mutable and immutable swap *)
   let swap_rows mat (a,b) =
     let temp = mat.(a) in (mat|.(a,mat.(b))); (mat|.(b,temp)); mat
 
   (* immutable swap two rows in matrix, return fresh matrix *)
-  let (|><|) m (r1,r2) : matrix = 
-    try swap_rows (~..m) (r1,r2) with _ -> failwith "immutable swap rows -- out of bounds?"
+  let (@><|) m (r1,r2) : matrix = 
+    try swap_rows (~..m) (r1,r2) with 
+    | Invalid_argument(a) -> raise (Out_of_Bounds "in @><|")
+    | _ -> raise (Undefined_Error "in @><|")
 
   (* mutable swap rows *)
-  let (|>.<|) m (r1,r2) : unit = 
-    try ignore (swap_rows m (r1,r2)) with _ -> failwith "mutable swap rows -- out of bounds?"
+  let (@>.<|) m (r1,r2) : unit = 
+    try ignore (swap_rows m (r1,r2)) with 
+    | Invalid_argument(a) -> raise (Out_of_Bounds "in @>.<|")
+    | _ -> raise (Undefined_Error "in @>.<|")
 
   (* print a vector/matrix *)
   let (~^>) v : unit =
     let printvec vec = 
       printf "[|\t"; Array.iter (fun el -> printf "%s" (elprint el)) vec; printf "|]\n"
-    in try printvec v with _ -> failwith "couldn't print vector"
+    in try printvec v with _ -> raise (Undefined_Error "couldn't print vector")
 
   let (~@>) m : unit = 
     let printmat mat = Array.iter (~^>) mat in
-    try printmat m with _ -> failwith "couldn't print matrix"
+    try printmat m with _ -> raise (Undefined_Error "couldn't print matrix")
 
 
   (* CALCULATION DEFINITIONS *)
@@ -216,7 +226,7 @@ end = struct
   and (!~) m : matrix = 
     let rec transpose m = (Array.map (fun row -> row.(0)) m) ^::@ 
       (try (transpose (Array.map (fun row -> row|-|1) m)) with _ -> [||])
-    in try transpose m with _ -> failwith "calc error -- taking transpose"
+    in try transpose m with _ -> raise (Undefined_Error "in !~ (transpose)")
 
   (* determinant of a (square) matrix *)
   and (!|) m : float = 
@@ -227,88 +237,95 @@ end = struct
           let ans = Array.mapi (fun ci el -> 
             (if (ci mod 2)=1 then (zero &- el) else el) &* (det ((0,ci) |-@ rows))
           ) (rows.(0)) in Array.fold_left (&+) zero ans
-    in try det m with _ -> failwith "calc error -- taking determinant"
+    in try det m with _ -> raise (Undefined_Error "in !| (determinant)")
 
   (* trace of a [square] matrix *)
   and (!^) m : float = 
     let trace mat = 
       let diagonal = (Array.mapi (fun ri row -> row.(ri)) mat) in
       Array.fold_left (fun acc el -> acc&+el) zero diagonal
-    in try trace m with _ -> failwith "calc error -- finding trace (not nxn?)"
+    in try trace m with _ -> raise (Not_Square "in !^ (trace)")
 
   (* quick check for invertability of matrix *)
   and (!??) m : bool = 
     let isinvertible mat = not ((!| mat) = zero) in
-    try isinvertible m with _ -> failwith "calc error -- checking invertability"
+    try isinvertible m with _ -> raise (Undefined_Error "in !?? (invertability)")
 
   (* inverse of a matrix *)
   and (!?) m : matrix = 
     let inverse mat = (* map identity matrix to rhs of m let reduce, rhs is inverse *)
       let n = ~||mat in Array.map (fun r -> r|-|n) (~@@ (mat @::@ (~|**|n)))
-    in try inverse m with _ -> failwith "logic -- matrix not invertible"
+    in try inverse m with _ -> raise (Singular_Matrix "in !? : not invertible")
 
 
 
   (* scale all entries in vector/matrix by constant value *)
   and (|*^) s v : vector = 
     let scalevec scale vec = Array.map (fun el -> el&*scale) vec in 
-    try scalevec s v with _ -> failwith "calc error -- scaling vector"
+    try scalevec s v with _ -> raise (Undefined_Error "in |*^ (scale vector)")
 
   and (|*@) s m : matrix = 
     let scalemat scale mat = Array.map (fun v -> scale|*^v) mat in 
-    try scalemat s m with _ -> failwith "calc error -- scaling matrix"
+    try scalemat s m with _ -> raise (Undefined_Error "in |*@ (scale matrix)")
 
 
 
   (* floating point : multiply [n x 1] vector by [n x 1] vector (or 1 x n) *) 
   and (^*^) v1 v2 : float = 
     let vxv r1 r2 = Array.fold_left (fun acc (e1,e2) -> (e1&*e2) &+ acc) zero (r1 >~< r2) in
-    try vxv v1 v2 with _ -> failwith "calc error -- vector multiplication mismatch"
+    try vxv v1 v2 with _ -> raise (Dimension_Mismatch "in ^*^")
 
   and (^+^) v1 v2 : vector = 
     let vpv r1 r2 = Array.map (fun (e1,e2) -> e1&+e2) (r1 >~< r2) in
-    try vpv v1 v2 with _ -> failwith "calc error -- vector addition mismatch"
+    try vpv v1 v2 with _ -> raise (Dimension_Mismatch "in ^+^")
 
   and (^-^) v1 v2 : vector = 
     let vmv r1 r2 = Array.map (fun (e1,e2) -> e1&+e2) (r1 >~< r2) in
-    try vmv v1 v2 with _ -> failwith "calc error -- vector subtraction mismatch"
+    try vmv v1 v2 with _ -> raise (Dimension_Mismatch "in ^-^")
 
   and (^=^) v1 v2 : bool =
     let veqv r1 r2 = Array.fold_left 
       (fun acc (e1,e2) -> ((absol (e1-.e2)) < epsilon) && acc) true (r1 >~< r2) 
-    in try veqv v1 v2 with _ -> failwith "calc error -- vector equality mismatch"
+    in try veqv v1 v2 with _ -> raise (Dimension_Mismatch "in ^=^")
 
   and (@*^) m v : vector = (* matrix * vector *)
     let mxv mat vec = Array.map (fun row -> row^*^vec) mat
-    in try mxv m v with _ -> failwith "calc error -- matrix multiplication with vector mismatch"
+    in try mxv m v with _ -> raise (Dimension_Mismatch "in @*^")
 
   and (@*@) m1 m2 : matrix = (* multiply/add/subtract two matrices of matching dimensions *)
     let mxm a1 a2 = Array.map (fun r1 -> Array.map (fun r2 -> r1^*^r2) (!~a2)) a1 in
-    try mxm m1 m2 with _ -> failwith "calc error -- matrix multiplication mismatch"
+    try mxm m1 m2 with _ -> raise (Dimension_Mismatch "in @*@")
 
   and (@+@) m1 m2 : matrix = 
     let mpm a1 a2 = Array.map (fun (r1,r2) -> r1 ^+^ r2) (a1 >~< a2) in
-    try mpm m1 m2 with _ -> failwith "calc error -- matrix addition mismatch"
+    try mpm m1 m2 with _ -> raise (Dimension_Mismatch "in @+@")
 
   and (@-@) m1 m2 : matrix =
     let mmm a1 a2 = Array.map (fun (r1,r2) -> r1 ^-^ r2) (a1 >~< a2) in
-    try mmm m1 m2 with _ -> failwith "calc error -- matrix subtraction mismatch"
+    try mmm m1 m2 with _ -> raise (Dimension_Mismatch "in @-@")
 
   (* not convinced this should be here *) 
   and (@/@) m1 m2 : matrix = (* should be @\@ as per matlab's stantard but whatever *)
     let divmat mat1 mat2 = (!? mat2) @*@ mat1 in
-    try divmat m1 m2 with _ -> failwith "calc error -- division of matrix by matrix"
+    try divmat m1 m2 with _ -> raise (Undefined_Error "in @/@")
 
   and (@=@) m1 m2 : bool =
     let mateq l r = Array.fold_left (fun acc (r1,r2) -> (r1^=^r2) && acc) true (l >~< r) in
-    try mateq m1 m2 with _ -> failwith "calc error -- matrix equality mismatch" 
+    try mateq m1 m2 with _ -> raise (Dimension_Mismatch "in @=@")
+
 
 
   and (@^|) m p : matrix = (* matrix exponentiation *)
+    let isnxn mat = let (r,c) = ~|||mat in r=c in
     let rec matpow = function 
-      | p when p<=1 -> m 
+      | p when p<0 -> raise (Undefined_Error "in @^| : negative exponent")
+      | p when p=0 -> ~|**|(~||m) (* identity matrix for exp 0 *)
+      | p when p=1 -> m 
       | p -> (m @*@ (matpow (p - 1)))
-    in try matpow p with _ -> failwith "calc error -- exponentiating matrix"
+    in try (if not (isnxn m) then raise (Not_Square "in @^| (exponent)") else matpow p) with 
+    | Not_Square msg -> ~@>m; raise (Not_Square msg)
+    | Undefined_Error e -> printf "Exponent: %d\n" p; raise (Undefined_Error e)
+    | _ -> raise (Undefined_Error "while exponentiating matrix")
 
 
 
@@ -326,10 +343,10 @@ end = struct
           if (absol (!a).(i).(k))>(absol (!a).(!maxrow).(k)) then maxrow := i
         ) done;
         
-        (!a)|>.<|(k,!maxrow); (* swap this row with pivot row *)
+        (!a)@>.<|(k,!maxrow); (* swap this row with pivot row *)
         
         (* apply scale to all elements in pivot row (or fail if singular) *)
-        if ((!a).(k).(k)) = zero then failwith "singluar matrix"
+        if ((!a).(k).(k)) = zero then raise (Singular_Matrix "in ~@@ (rref)")
         else a := Array.mapi (fun i r -> if i=k then (one &/ (r.(k)))|*^r else r) (!a);
 
         (* finally apply changes to all other rows *)
@@ -341,7 +358,9 @@ end = struct
             done; (!a)|..(i,k,zero))
         ) done;
       ) done; !a 
-    in try rref m with _ -> failwith "calc error -- failure in rref: singular matrix"
+    in try rref m with
+    | Singular_Matrix e -> ~@>m; raise (Singular_Matrix e)
+    | _ -> raise (Undefined_Error "in ~@@ (rref)")
 
 end;;
 

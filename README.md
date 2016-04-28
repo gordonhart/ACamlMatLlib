@@ -2,26 +2,26 @@
 
 Purely symbolic matrix manipulation suite comprised of **45 operators** for matrix (OCaml `array`) creation, manipulation and calculation—mostly translations of Array library functions with some interesting additions. Will likely continue to grow as it's used.
 
-----
+
 
 ## Usage
 
 In general, the leftmost char of an operator signals the associativity/left argument for the prefix or infix operators. The middle character denotes the operation being carried out, and the rightmost character signals the righthand argument for infix operators.
 ```
-   ~      prefix - if first char of op is ~ then there is only 1 argument, postfixed 
-   !      prefix - same as ~ but for matrix operations 
-   ^      vector - whenever this shows up, the argument on that side is a vector 
-   @      matrix - same as ^ but for matrices   
-   |      scalar - same as ^,@, used when a scalar is required as an argument 
+   ~      prefix - if first character of operator is ~ then there is only 1 argument, postfixed (~? abc) 
+   !      prefix - same as ~ but for matrix operations (!? mat)
+   ^      vector - the argument on that side is a vector (vec ^?? ... or ... ??^ vec)
+   @      matrix - same as ^ but for matrices (... ??@ mat or mat @?? ...)
+   |      scalar - same as ^,@, used when a scalar is required as an argument (ex. mat @^| 3 or 2 |*| 1.0)
 
-  ~?>     print operator for matrix/vector as described by ?          
+  ~?>     print operator for matrix/vector (ex. ~@> mat, ~^> vec)
 ```
 
-----
+
 
 ## Operators
 
-It may appear incomprehensible at first, but there is indeed some method to the madness.
+It appears incomprehensible at first but you may find that there's some method to the madness.
 ``` ocaml
 module Matlib : sig
 
@@ -50,16 +50,16 @@ module Matlib : sig
   val ( |-|  ) : vector -> int -> vector          (* remove n head elements *)
   val ( |-^  ) : int -> 'a array -> 'a array      (* remove index from v, or remove row from m *)
   val ( |-@  ) : int * int -> matrix -> matrix    (* remove row,col from matrix *)
-  
+
+  val ( @><| ) : matrix -> int * int -> matrix    (* swap rows in matrix *)
+  val ( @>.<|) : matrix -> int * int -> unit      (* mutable: swap rows in matrix *)
+
   val ( ^::^ ) : vector -> vector -> vector       (* horizontally join vectors *)
   val ( ^::@ ) : vector -> matrix -> matrix       (* add row to top of matrix *)
   val ( >::@ ) : vector -> matrix -> matrix       (* add column to front of matrix *)
   val ( @::^ ) : matrix -> vector -> matrix       (* add row to bottom of matrix *)
   val ( @::< ) : matrix -> vector -> matrix       (* add column to right of matrix *)
   val ( @::@ ) : matrix -> matrix -> matrix       (* horizontally join matrices *)
-  
-  val ( |><| ) : matrix -> int * int -> matrix    (* swap rows in matrix *)
-  val ( |>.<|) : matrix -> int * int -> unit      (* mutable: swap rows in matrix *)
   
   val ( |*^  ) : float -> vector -> vector        (* scale vector *)
   val ( |*@  ) : float -> matrix -> matrix        (* scale matrix *)  
@@ -92,7 +92,7 @@ end
 
 #### Implementation
 
-The current form of ACamlMatLib currently uses native floats but can be easily changed by altering the block defining literals:
+The current form of ACamlMatLib uses native floats but can be easily changed by altering the block defining literals:
 ``` ocaml
   type vector = float array 
 
@@ -100,8 +100,8 @@ The current form of ACamlMatLib currently uses native floats but can be easily c
   and absol = fun x -> abs_float x
   and elprint = fun e -> sprintf "%0.3f\t" e
   and epsilon = 1e-5
-  and (&+) a b = a+.b
-  and (&-) a b = a-.b
-  and (&* ) a b = a*.b
-  and (&/) a b = a/.b
+  and ( &+ ) a b = a+.b
+  and ( &- ) a b = a-.b
+  and ( &* ) a b = a*.b
+  and ( &/ ) a b = a/.b
 ```
