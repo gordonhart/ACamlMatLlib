@@ -13,6 +13,7 @@ In general, the leftmost character of an operator signals the associativity (pre
    ^      vector - the argument on that side is a vector (vec ^?? ... or ... ??^ vec)
    @      matrix - same as ^ but for matrices (... ??@ mat or mat @?? ...)
    |      scalar - same as ^,@, used when a scalar is required as an argument (ex. mat @^| 3 or 2 |*| 1.0)
+   .      mutable operator - whenever . appears, there is mutability at play 
 
   ~?>     print operator for matrix/vector (ex. ~@> mat, ~^> vec)
 ```
@@ -33,13 +34,16 @@ module Matlib : sig
   val ( ~|++ ) : float list list -> matrix                (* transform list list to matrix *)
   val ( ~|-- ) : matrix -> float list list                (* transform matrix to list list *)
 
-  val ( ~.   ) : vector -> vector                         (* get copy a vector *)
-  val ( ~..  ) : matrix -> matrix                         (* get copy a matrix *)
+  val ( ~|^  ) : vector -> vector                         (* get copy a vector *)
+  val ( ~|@  ) : matrix -> matrix                         (* get copy a matrix *)
 
-  val ( ~||  ) : 'a array -> int                          (* get length of v, or #rows of m *)
-  val ( ~||| ) : matrix -> int * int                      (* get (r,c) size of matrix *)
+  val ( ~^>  ) : vector -> unit                           (* print vector *)
+  val ( ~@>  ) : matrix -> unit                           (* print matrix *)
+
+  val ( ~|   ) : 'a array -> int                          (* get length of v, or #rows of m *)
+  val ( ~||  ) : matrix -> int * int                      (* get (r,c) size of matrix *)
   val ( ~||? ) : matrix -> bool                           (* rectangular matrix test *)
-  val ( ~|||?) : matrix -> bool                           (* square matrix test *)
+  val ( ~|=|?) : matrix -> bool                           (* square matrix test *)
 
   val ( >~<  ) : 'a array -> 'b array -> ('a * 'b) array  (* zip arrays to tupled array *)
 
@@ -85,10 +89,7 @@ module Matlib : sig
   val ( !~   ) : matrix -> matrix                         (* transpose *)
   val ( !??  ) : matrix -> bool                           (* intertability test *)
   val ( !?   ) : matrix -> matrix                         (* invert matrix *)
-  val ( !@@  ) : matrix -> matrix                         (* mutable: gaussian elimination *)
-
-  val ( ~^>  ) : vector -> unit                           (* print vector *)
-  val ( ~@>  ) : matrix -> unit                           (* print matrix *)
+  val ( !@@  ) : matrix -> matrix                         (* gaussian elimination *)
 
 end
 ```
@@ -105,7 +106,7 @@ The current form of ACamlMatLib uses native floats but can be easily changed by 
   let zero = 0. and one = 1. 
   and absol = fun x -> abs_float x
   and elprint = fun e -> sprintf "%0.3f\t" e
-  and epsilon = 1e-5
+  and epsilon = 1e-7
   and ( &+ ) a b = a+.b
   and ( &- ) a b = a-.b
   and ( &* ) a b = a*.b

@@ -8,7 +8,7 @@
 (*    Purely symbolic matrix manipulation suite.                                            *)
 (*      EVERYTHING is immutable unless explicitly stated otherwise!                         *)
 (*                                                                                          *)
-(*    There are 45 operators--should be comprehensible after reading                        *)
+(*    There are 51 operators--should be comprehensible after reading                        *)
 (*      through the signature for a few minutes.                                            *)
 (*                                                                                          *)
 (*    In general, the leftmost char of an operator signals the associativity/left           *)
@@ -16,14 +16,15 @@
 (*      operation being carried out, and the rightmost char signals the right assoc         *)
 (*      argument for infix operators.                                                       *)
 (*                                                                                          *)
-(*  --------------------------------------------------------------------------------------  *)
+(*   ------------------------------------------------------------------------------------   *)
 (*            key                                                                           *)
-(*  --------------------------------------------------------------------------------------  *)
+(*   ------------------------------------------------------------------------------------   *)
 (*     ~      prefix - if first char of op is ~ then there is only 1 argument, postfixed    *)
 (*     !      prefix - same as ~ but for matrix operations                                  *)
 (*     ^      vector - whenever this shows up, the argument on that side is a vector        *)
 (*     @      matrix - same as ^ but for matrices                                           *)
 (*     |      scalar - same as ^,@, used when a scalar is required as an argument           *)
+(*     .      mutable operator - whenever . appears, there is mutability at play            *)
 (*                                                                                          *)
 (*     ~?>    print operator for matrix/vector as described by ?                            *)
 (*                                                                                          *)
@@ -41,13 +42,16 @@ module ACamlMatLib : sig
   val ( ~|++ ) : float list list -> matrix                (* transform list list to matrix *)
   val ( ~|-- ) : matrix -> float list list                (* transform matrix to list list *)
 
-  val ( ~.   ) : vector -> vector                         (* get copy a vector *)
-  val ( ~..  ) : matrix -> matrix                         (* get copy a matrix *)
+  val ( ~|^  ) : vector -> vector                         (* get copy a vector *)
+  val ( ~|@  ) : matrix -> matrix                         (* get copy a matrix *)
 
-  val ( ~||  ) : 'a array -> int                          (* get length of v, or #rows of m *)
-  val ( ~||| ) : matrix -> int * int                      (* get (r,c) size of matrix *)
+  val ( ~^>  ) : vector -> unit                           (* print vector *)
+  val ( ~@>  ) : matrix -> unit                           (* print matrix *)
+
+  val ( ~|   ) : 'a array -> int                          (* get length of v, or #rows of m *)
+  val ( ~||  ) : matrix -> int * int                      (* get (r,c) size of matrix *)
   val ( ~||? ) : matrix -> bool                           (* rectangular matrix test *)
-  val ( ~|||?) : matrix -> bool                           (* square matrix test *)
+  val ( ~|=|?) : matrix -> bool                           (* square matrix test *)
 
   val ( >~<  ) : 'a array -> 'b array -> ('a * 'b) array  (* zip arrays to tupled array *)
 
@@ -93,10 +97,7 @@ module ACamlMatLib : sig
   val ( !~   ) : matrix -> matrix                         (* transpose *)
   val ( !??  ) : matrix -> bool                           (* intertability test *)
   val ( !?   ) : matrix -> matrix                         (* invert matrix *)
-  val ( !@@  ) : matrix -> matrix                         (* mutable: gaussian elimination *)
-
-  val ( ~^>  ) : vector -> unit                           (* print vector *)
-  val ( ~@>  ) : matrix -> unit                           (* print matrix *)
+  val ( !@@  ) : matrix -> matrix                         (* gaussian elimination *)
 
 end = struct
 
@@ -106,7 +107,7 @@ end = struct
   let zero = 0. and one = 1. 
   and absol = fun x -> abs_float x
   and elprint = fun e -> sprintf "%0.3f\t" e
-  and epsilon = 1e-5
+  and epsilon = 1e-7
   and (&+) a b = a+.b
   and (&-) a b = a-.b
   and (&* ) a b = a*.b
@@ -121,10 +122,12 @@ end = struct
 
   (* MANIPULATION DEFINITIONS *)
   (* easy accessors to size *)
-  let (~||) v : int = Array.length v
-  let (~|||) m : int * int = (~||m, ~||(m.(0)))
-  let (~||?) m : bool = Array.fold_left (fun acc r -> acc && ((~|| r)=(~||(m.(0))))) true m
-  let (~|||?) m : bool = let (r,c) = ~|||m in r=c (* test if a matrix is square *)
+  let (~|) v : int = Array.length v
+  let (~||?) m : bool = (* test for rectangular matrix *)
+    Array.fold_left (fun acc r -> acc && ((~|r)=(~|(m.(0))))) true m
+  let (~||) m : int * int = if ~||? m then (~|m, ~|(m.(0))) 
+    else raise (Logical_Error "in ~|| (matrix size: not a rectangular matrix")
+  let (~|=|?) m : bool = let (r,c) = ~||m in r=c (* test if a matrix is square *)
 
   (* to make arrays less annoying to work with *)
   let (~|+) v : 'a array = Array.of_list v (* create array from list *)
@@ -134,9 +137,9 @@ end = struct
   let (~|--) m : float list list = ~|- (Array.map (~|-) m)
 
   (* create FRESH copies of vectors/matrices *)
-  (* using this with a matrix, only copies the references to rows... use ~.. for matrices *)
-  let (~.) v : vector = Array.copy v
-  let (~..) m : matrix = Array.map (~.) (Array.copy m)
+  (* using this with a matrix, only copies the references to rows... use ~|@ for matrices *)
+  let (~|^) v : vector = Array.copy v
+  let (~|@) m : matrix = Array.map (~|^) (Array.copy m)
 
   (* MUTABLE setters -- just an alias to a nicer setting notation *)
   (* tupling is so much nicer for many args--no bullshit about parenthesizing *)
@@ -147,7 +150,7 @@ end = struct
 
   (* zip two arrays into a single tupled array *)
   let (>~<) v1 v2 : ('a * 'b) array = 
-    if ((~||v1)=(~||v2)) then Array.mapi (fun i x -> (x,v2.(i))) v1 
+    if ((~|v1)=(~|v2)) then Array.mapi (fun i x -> (x,v2.(i))) v1 
     else raise (Dimension_Mismatch "in >~<")
 
   (* remove an index from 'a array, return shorter version *)
@@ -155,24 +158,24 @@ end = struct
     let remove_index ind vec = 
       let inc = ref (-1) in let inc_is loc = inc := !inc + 1; !inc = loc in
       Array.fold_left (fun a x -> if inc_is ind then a else Array.append a [|x|]) [||] vec
-    in try if (i < (~|| v)) then remove_index i v else raise (Out_of_Bounds "in |-^") with
-    | Out_of_Bounds e -> printf "i: %d\n||v||: %d\n" i (~||v); raise (Out_of_Bounds e)
+    in try if (i < (~| v)) then remove_index i v else raise (Out_of_Bounds "in |-^") with
+    | Out_of_Bounds e -> printf "i: %d\n||v||: %d\n" i (~|v); raise (Out_of_Bounds e)
     | _ -> raise (Undefined_Error "in |-^ : couldn't remove index from vector")
 
   (* cut off n elements from the front of vector *)
   let (^--|) v n : 'a array = (* a|-|1 is effectively a call to the tail of the vector *)
-    try Array.sub v n ((~|| v) - n) 
+    try Array.sub v n ((~| v) - n) 
     with _ -> raise (Undefined_Error "couldn't remove elements from vector")
 
-  (* remove and return matrix without a certain column *)
+  (* remove let return matrix without a certain column *)
   let (@-|) m ci : matrix = 
     try Array.map (fun row -> row^-|ci) m
     with _ -> raise (Undefined_Error "couldn't remove col from matrix")
 
-  (* remove and return matrix without a certain row,column *)
+  (* remove let return matrix without a certain row,column *)
   let (@--|) m (ri,ci) : matrix = 
     try (m^-|ri)@-|ci (* Array.map (fun row -> row|-^ci) *)
-    with _ -> raise (Undefined_Error "couldn't remove row and col from matrix")
+    with _ -> raise (Undefined_Error "couldn't remove row let col from matrix")
 
   (* vector/matrix creation symbols *)
   let (|*|) s v : 'a array = (* init array of size s with values v *)
@@ -214,12 +217,12 @@ end = struct
     try Array.map (fun (r1,r2) -> r1 ^::^ r2) (m1 >~< m2) 
     with _ -> raise (Undefined_Error "couldn't append matrices")
 
-  (* aux function used for the mutable and immutable swap *)
+  (* aux function used for the mutable let immutable swap *)
   let swap_rows mat (a,b) = let temp = mat.(a) in (mat^..(a,mat.(b))); (mat^..(b,temp))
 
   (* immutable swap two rows in matrix, return fresh matrix *)
   let (@><|) m (r1,r2) : matrix = 
-    try let mat = ~.. m in swap_rows mat (r1,r2); mat with 
+    try let mat = ~|@ m in swap_rows mat (r1,r2); mat with 
     | Invalid_argument n -> raise (Out_of_Bounds "in @><|")
     | _ -> raise (Undefined_Error "in @><|")
 
@@ -255,7 +258,7 @@ end = struct
     let rec det = function
       | [||] -> zero
       | [| [| el |] |] -> el (* base case single element matrix *)
-      | rows when not (~|||? rows) -> raise (Not_Square "in !| (determinant")
+      | rows when not (~|=|? rows) -> raise (Not_Square "in !| (determinant")
       | rows -> (* else full matrix, apply pattern let recur *)
           let ans = Array.mapi (fun ci el -> 
             (if (ci mod 2)=1 then (zero &- el) else el) &* (det (rows @--| (0,ci)))
@@ -267,7 +270,7 @@ end = struct
   (* trace of a [square] matrix *)
   and (!^) m : float = 
     let trace mat = 
-      if not (~|||?m) then raise (Not_Square "in !^ (trace)")
+      if not (~|=|? m) then raise (Not_Square "in !^ (trace)")
       else (let diagonal = (Array.mapi (fun ri row -> row.(ri)) mat) in
         Array.fold_left (fun acc el -> acc&+el) zero diagonal)
     in try trace m with 
@@ -277,12 +280,12 @@ end = struct
   (* quick check for invertability of matrix *)
   and (!??) m : bool = 
     let isinvertible mat = not ((!| mat) = zero) in
-    try isinvertible m with _ -> raise (Undefined_Error "in !?? (invertability)")
+    try isinvertible m with _ -> raise (Not_Square "in !?? (invertability)")
 
   (* inverse of a matrix *)
   and (!?) m : matrix = 
     let inverse mat = (* map identity matrix to rhs of m let reduce, rhs is inverse *)
-      let n = ~||mat in Array.map (fun r -> r^--|n) (!@@ (mat @::@ (~|**|n)))
+      let n = ~|mat in Array.map (fun r -> r^--|n) (!@@ (mat @::@ (~|**|n)))
     in try inverse m with _ -> raise (Singular_Matrix "in !? : not invertible")
 
 
@@ -346,10 +349,10 @@ end = struct
   and (@^|) m p : matrix = (* matrix exponentiation *)
     let rec matpow = function 
       | p when p<0 -> raise (Logical_Error "in @^| : negative exponent")
-      | p when p=0 -> ~|**|(~||m) (* identity matrix for exp 0 *)
+      | p when p=0 -> ~|**|(~|m) (* identity matrix for exp 0 *)
       | p when p=1 -> m 
       | p -> (m @*@ (matpow (p - 1)))
-    in try (if ~|||? m then matpow p else raise (Not_Square "in @^| (exponent)")) with 
+    in try (if ~|=|? m then matpow p else raise (Not_Square "in @^| (exponent)")) with 
     | Not_Square msg -> ~@>m; raise (Not_Square msg)
     | Logical_Error e -> printf "Exponent: %d\n" p; raise (Logical_Error e)
     | _ -> raise (Undefined_Error "in @^| (matrix exponent)")
@@ -357,12 +360,13 @@ end = struct
 
 
   (* gaussian elimination: transform a matrix to reduced row echelon form *)
+  (* utilize full pivoting to ensure numerical stability *)
   (* ugly for loops but it's really the best way to deal with matrices, sorry ocaml *)
   and (!@@) m : matrix = 
     let rref mat = 
-      let a = ref (~.. mat) in (* reference to the matrix being modified *)
+      let a = ref (~|@ mat) in (* reference to the matrix being modified *)
 
-      let (n,m) = ~||| (!a) in (* rows, columns *)      
+      let (n,m) = ~|| (!a) in (* rows, columns *)      
 
       for k = 0 to (min (n - 1) (m - 1)) do (
         let maxrow = ref k in
@@ -373,7 +377,7 @@ end = struct
         (!a)@>.<|(k,!maxrow); (* swap this row with pivot row *)
         
         (* apply scale to all elements in pivot row (or fail if singular) *)
-        if ((!a).(k).(k)) = zero then raise (Singular_Matrix "in ~@@ (rref)")
+        if ((!a).(k).(k)) = zero then raise (Singular_Matrix "in !@@ (rref)")
         else a := Array.mapi (fun i r -> if i=k then (one &/ (r.(k)))|*^r else r) (!a);
 
         (* finally apply changes to all other rows *)
@@ -387,7 +391,7 @@ end = struct
       ) done; !a 
     in try rref m with
     | Singular_Matrix e -> ~@>m; raise (Singular_Matrix e)
-    | _ -> raise (Undefined_Error "in ~@@ (rref)")
+    | _ -> raise (Undefined_Error "in !@@ (rref)")
 
 end;;
 
