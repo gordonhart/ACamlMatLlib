@@ -31,8 +31,8 @@
 (* ======================================================================================== *)
 
 
-(* the settings module for use in ACamlMatLib functor -- define custom element type *)
-(* with custom operations *)
+(* the settings module for use in ACamlMatLib functor -- *)
+(* define custom element type with custom operations *)
 module type MatlibSettings = sig
 
   type elt

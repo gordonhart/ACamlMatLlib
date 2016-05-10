@@ -24,15 +24,16 @@ In general, the leftmost character of an operator signals the associativity (pre
 
 It appears incomprehensible at first but you may find that there's some method to the madness.
 ``` ocaml
-module ACamlMatLib : sig
+module type ACamlMatLib = sig
 
-  type vector = float array         
-  type matrix = vector array  
+  type elt
+  type vector = elt array
+  type matrix = vector array
 
   val ( ~|+  ) : 'a list -> 'a array                      (* transform list to array *)
   val ( ~|-  ) : 'a array -> 'a list                      (* transform array to list *)
-  val ( ~|++ ) : float list list -> matrix                (* transform list list to matrix *)
-  val ( ~|-- ) : matrix -> float list list                (* transform matrix to list list *)
+  val ( ~|++ ) : elt list list -> matrix                  (* transform list list to matrix *)
+  val ( ~|-- ) : matrix -> elt list list                  (* transform matrix to list list *)
 
   val ( ~|^  ) : vector -> vector                         (* get copy a vector *)
   val ( ~|@  ) : matrix -> matrix                         (* get copy a matrix *)
@@ -47,13 +48,13 @@ module ACamlMatLib : sig
 
   val ( >~<  ) : 'a array -> 'b array -> ('a * 'b) array  (* zip arrays to tupled array *)
 
-  val ( ^..  ) : vector -> int * float -> unit            (* mutable: modify index in vector *)
-  val ( ^... ) : vector -> (int * float) list -> unit     (* mutable: modify many vector els *)
-  val ( @..  ) : matrix -> int * int * float -> unit      (* mutable: modify index in matrix *)
-  val ( @... ) : matrix -> (int*int*float) list -> unit   (* mutable: modify many els in mat *)
+  val ( ^..  ) : vector -> int * elt -> unit              (* mutable: modify index in vector *)
+  val ( ^... ) : vector -> (int * elt) list -> unit       (* mutable: modify many vector els *)
+  val ( @..  ) : matrix -> int * int * elt -> unit        (* mutable: modify index in matrix *)
+  val ( @... ) : matrix -> (int*int*elt) list -> unit     (* mutable: modify many els in mat *)
 
   val ( |*|  ) : int -> 'a -> 'a array                    (* create vector *)
-  val ( |**| ) : int * int -> float -> matrix             (* create matrix *)
+  val ( |**| ) : int * int -> elt -> matrix               (* create matrix *)
   val ( ~|**|) : int -> matrix                            (* create identity matrix of size *)
 
   val ( ^-|  ) : 'a array -> int -> 'a array              (* remove el from v, or row from m *)
@@ -70,9 +71,9 @@ module ACamlMatLib : sig
   val ( @::< ) : matrix -> vector -> matrix               (* add column to right of matrix *)
   val ( @::@ ) : matrix -> matrix -> matrix               (* horizontally join matrices *)
   
-  val ( |*^  ) : float -> vector -> vector                (* scale vector *)
-  val ( |*@  ) : float -> matrix -> matrix                (* scale matrix *)  
-  val ( ^*^  ) : vector -> vector -> float                (* v * v *)
+  val ( |*^  ) : elt -> vector -> vector                  (* scale vector *)
+  val ( |*@  ) : elt -> matrix -> matrix                  (* scale matrix *)  
+  val ( ^*^  ) : vector -> vector -> elt                  (* v * v *)
   val ( ^+^  ) : vector -> vector -> vector               (* v + v *)
   val ( ^-^  ) : vector -> vector -> vector               (* v - v *)
   val ( ^=^  ) : vector -> vector -> bool                 (* vector equality *)
@@ -84,12 +85,13 @@ module ACamlMatLib : sig
   val ( @=@  ) : matrix -> matrix -> bool                 (* matrix equality *)
   val ( @^|  ) : matrix -> int -> matrix                  (* matrix exponent *)
 
-  val ( !|   ) : matrix -> float                          (* determinant *)
-  val ( !^   ) : matrix -> float                          (* trace *) 
+  val ( !|   ) : matrix -> elt                            (* determinant *)
+  val ( !^   ) : matrix -> elt                            (* trace *) 
   val ( !~   ) : matrix -> matrix                         (* transpose *)
   val ( !??  ) : matrix -> bool                           (* intertability test *)
   val ( !?   ) : matrix -> matrix                         (* invert matrix *)
-  val ( !@@  ) : matrix -> matrix                         (* gaussian elimination *)
+  val ( !@   ) : matrix -> matrix                         (* transform m to row echelon form *)
+  val ( !@@  ) : matrix -> matrix                         (* reduced row echelon form *)
 
 end
 ```
@@ -99,7 +101,7 @@ end
 
 #### Implementation
 
-ACamlMatLib features polymorphic computations by utilizing a functor requiring the `MatLibSettings` module be passed into the matrix library upon creation. 
+ACamlMatLib allows for polymorphic computations by utilizing a functor requiring the `MatLibSettings` module be passed into the matrix library upon creation. 
 
 See `examples/element_types.ml` for details.
 <!-- 
