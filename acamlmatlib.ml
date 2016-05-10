@@ -8,7 +8,7 @@
 (*    Purely symbolic matrix manipulation suite.                                            *)
 (*      EVERYTHING is immutable unless explicitly stated otherwise!                         *)
 (*                                                                                          *)
-(*    There are 51 operators--should be comprehensible after reading                        *)
+(*    There are 52 operators--should be comprehensible after reading                        *)
 (*      through the signature for a few minutes.                                            *)
 (*                                                                                          *)
 (*    In general, the leftmost char of an operator signals the associativity/left           *)
@@ -31,16 +31,35 @@
 (* ======================================================================================== *)
 
 
+(* the settings module for use in ACamlMatLib functor -- define custom element type *)
+(* with custom operations *)
+module type MatlibSettings = sig
 
-module ACamlMatLib : sig
+  type elt
+  val zero : elt                    (* define element type elt for matrices *)
+  val one : elt                     (* set zero,one as reference points *)
+  val absol : elt -> elt            (* absolute value function for element type elt *)
+  val elprint : elt -> string       (* printout for type elt *)
+  val t_eq : elt -> elt -> bool     (* equality test for type elt *)
+  val t_add : elt -> elt -> elt     (* element type aritmetic operations *)
+  val t_sub : elt -> elt -> elt
+  val t_mul : elt -> elt -> elt
+  val t_div : elt -> elt -> elt
 
-  type vector = float array         
-  type matrix = vector array  
+end
+
+
+
+module type MatLib = sig
+
+  type elt
+  type vector = elt array
+  type matrix = vector array
 
   val ( ~|+  ) : 'a list -> 'a array                      (* transform list to array *)
   val ( ~|-  ) : 'a array -> 'a list                      (* transform array to list *)
-  val ( ~|++ ) : float list list -> matrix                (* transform list list to matrix *)
-  val ( ~|-- ) : matrix -> float list list                (* transform matrix to list list *)
+  val ( ~|++ ) : elt list list -> matrix                  (* transform list list to matrix *)
+  val ( ~|-- ) : matrix -> elt list list                  (* transform matrix to list list *)
 
   val ( ~|^  ) : vector -> vector                         (* get copy a vector *)
   val ( ~|@  ) : matrix -> matrix                         (* get copy a matrix *)
@@ -55,13 +74,13 @@ module ACamlMatLib : sig
 
   val ( >~<  ) : 'a array -> 'b array -> ('a * 'b) array  (* zip arrays to tupled array *)
 
-  val ( ^..  ) : vector -> int * float -> unit            (* mutable: modify index in vector *)
-  val ( ^... ) : vector -> (int * float) list -> unit     (* mutable: modify many vector els *)
-  val ( @..  ) : matrix -> int * int * float -> unit      (* mutable: modify index in matrix *)
-  val ( @... ) : matrix -> (int*int*float) list -> unit   (* mutable: modify many els in mat *)
+  val ( ^..  ) : vector -> int * elt -> unit              (* mutable: modify index in vector *)
+  val ( ^... ) : vector -> (int * elt) list -> unit       (* mutable: modify many vector els *)
+  val ( @..  ) : matrix -> int * int * elt -> unit        (* mutable: modify index in matrix *)
+  val ( @... ) : matrix -> (int*int*elt) list -> unit     (* mutable: modify many els in mat *)
 
   val ( |*|  ) : int -> 'a -> 'a array                    (* create vector *)
-  val ( |**| ) : int * int -> float -> matrix             (* create matrix *)
+  val ( |**| ) : int * int -> elt -> matrix               (* create matrix *)
   val ( ~|**|) : int -> matrix                            (* create identity matrix of size *)
 
   val ( ^-|  ) : 'a array -> int -> 'a array              (* remove el from v, or row from m *)
@@ -78,9 +97,9 @@ module ACamlMatLib : sig
   val ( @::< ) : matrix -> vector -> matrix               (* add column to right of matrix *)
   val ( @::@ ) : matrix -> matrix -> matrix               (* horizontally join matrices *)
   
-  val ( |*^  ) : float -> vector -> vector                (* scale vector *)
-  val ( |*@  ) : float -> matrix -> matrix                (* scale matrix *)  
-  val ( ^*^  ) : vector -> vector -> float                (* v * v *)
+  val ( |*^  ) : elt -> vector -> vector                  (* scale vector *)
+  val ( |*@  ) : elt -> matrix -> matrix                  (* scale matrix *)  
+  val ( ^*^  ) : vector -> vector -> elt                  (* v * v *)
   val ( ^+^  ) : vector -> vector -> vector               (* v + v *)
   val ( ^-^  ) : vector -> vector -> vector               (* v - v *)
   val ( ^=^  ) : vector -> vector -> bool                 (* vector equality *)
@@ -92,27 +111,33 @@ module ACamlMatLib : sig
   val ( @=@  ) : matrix -> matrix -> bool                 (* matrix equality *)
   val ( @^|  ) : matrix -> int -> matrix                  (* matrix exponent *)
 
-  val ( !|   ) : matrix -> float                          (* determinant *)
-  val ( !^   ) : matrix -> float                          (* trace *) 
+  val ( !|   ) : matrix -> elt                            (* determinant *)
+  val ( !^   ) : matrix -> elt                            (* trace *) 
   val ( !~   ) : matrix -> matrix                         (* transpose *)
   val ( !??  ) : matrix -> bool                           (* intertability test *)
   val ( !?   ) : matrix -> matrix                         (* invert matrix *)
-  val ( !@@  ) : matrix -> matrix                         (* gaussian elimination *)
+  val ( !@   ) : matrix -> matrix                         (* transform m to row echelon form *)
+  val ( !@@  ) : matrix -> matrix                         (* reduced row echelon form *)
 
-end = struct
+end
 
-  type vector = float array (* maybe make this polymorphic later *)
+
+
+(* by declaring "with type..." we are allowed to access the internal type elt from elsewhere *)
+module ACamlMatLib (Sts : MatlibSettings) : (MatLib with type elt = Sts.elt) = struct
+
+  type elt = Sts.elt
+  type vector = elt array
   type matrix = vector array
 
-  let zero = 0. and one = 1. 
-  and absol = fun x -> abs_float x
-  and elprint = fun e -> sprintf "%0.3f\t" e
-  and epsilon = 1e-7
-  and (&+) a b = a+.b
-  and (&-) a b = a-.b
-  and (&* ) a b = a*.b
-  and (&/) a b = a/.b
+  let zero = Sts.zero and one = Sts.one and absol = Sts.absol
+  and ( &= ) = Sts.t_eq
+  and ( &+ ) = Sts.t_add
+  and ( &- ) = Sts.t_sub
+  and ( &* ) = Sts.t_mul
+  and ( &/ ) = Sts.t_div
 
+  (* define exceptions *)
   exception Not_Square of string
   exception Out_of_Bounds of string
   exception Undefined_Error of string
@@ -134,11 +159,11 @@ end = struct
   let (~|-) v : 'a list = Array.to_list v (* create list from array *)
   let (~|++) ll : matrix = let m = ~|+ (List.map (~|+) ll) in
     if (~||? m) then m else raise (Logical_Error "in ~|++ : input not rectangular")
-  let (~|--) m : float list list = ~|- (Array.map (~|-) m)
+  let (~|--) m : elt list list = ~|- (Array.map (~|-) m)
 
   (* create FRESH copies of vectors/matrices *)
   (* using this with a matrix, only copies the references to rows... use ~|@ for matrices *)
-  let (~|^) v : vector = Array.copy v
+  let (~|^) v : 'a array = Array.copy v
   let (~|@) m : matrix = Array.map (~|^) (Array.copy m)
 
   (* MUTABLE setters -- just an alias to a nicer setting notation *)
@@ -188,7 +213,7 @@ end = struct
     in try makemat (r,c) v with _ -> raise (Undefined_Error "couldn't create matrix")
 
   let (~|**|) n : matrix = (* identity matrix of size [ n x n ] *)
-    let identitymat size =
+    let identitymat size = 
       Array.mapi (fun i row -> row^..(i,one); row) ((size,size)|**|zero) in
     try identitymat n with _ -> raise (Undefined_Error "couldn't create identity matrix")
 
@@ -235,7 +260,7 @@ end = struct
   (* print a vector/matrix *)
   let (~^>) v : unit =
     let printvec vec = 
-      printf "[|\t"; Array.iter (fun el -> printf "%s" (elprint el)) vec; printf "|]\n"
+      printf "[|\t"; Array.iter (fun el -> printf "%s" (Sts.elprint el)) vec; printf "|]\n"
     in try printvec v with _ -> raise (Undefined_Error "couldn't print vector")
 
   let (~@>) m : unit = 
@@ -254,9 +279,9 @@ end = struct
     in try transpose m with _ -> raise (Undefined_Error "in !~ (transpose)")
 
   (* determinant of a (square) matrix *)
-  and (!|) m : float = 
+  and (!|) m : elt = 
     let rec det = function
-      | [||] -> zero
+        [||] -> zero
       | [| [| el |] |] -> el (* base case single element matrix *)
       | rows when not (~|=|? rows) -> raise (Not_Square "in !| (determinant")
       | rows -> (* else full matrix, apply pattern let recur *)
@@ -268,7 +293,7 @@ end = struct
     | _ -> raise (Undefined_Error "in !| (determinant)")
 
   (* trace of a [square] matrix *)
-  and (!^) m : float = 
+  and (!^) m : elt = 
     let trace mat = 
       if not (~|=|? m) then raise (Not_Square "in !^ (trace)")
       else (let diagonal = (Array.mapi (fun ri row -> row.(ri)) mat) in
@@ -301,8 +326,8 @@ end = struct
 
 
 
-  (* floating point : multiply [n x 1] vector by [n x 1] vector (or 1 x n) *) 
-  and (^*^) v1 v2 : float = 
+  (* ting point : multiply [n x 1] vector by [n x 1] vector (or 1 x n) *) 
+  and (^*^) v1 v2 : elt = 
     let vxv r1 r2 = Array.fold_left (fun acc (e1,e2) -> (e1&*e2) &+ acc) zero (r1 >~< r2) in
     try vxv v1 v2 with _ -> raise (Dimension_Mismatch "in ^*^")
 
@@ -315,8 +340,7 @@ end = struct
     try vmv v1 v2 with _ -> raise (Dimension_Mismatch "in ^-^")
 
   and (^=^) v1 v2 : bool =
-    let veqv r1 r2 = Array.fold_left 
-      (fun acc (e1,e2) -> ((absol (e1-.e2)) < epsilon) && acc) true (r1 >~< r2) 
+    let veqv r1 r2 = Array.fold_left (fun acc (e1,e2) -> (e1 &= e2) && acc) true (r1 >~< r2) 
     in try veqv v1 v2 with _ -> raise (Dimension_Mismatch "in ^=^")
 
   and (@*^) m v : vector = (* matrix * vector *)
@@ -348,7 +372,7 @@ end = struct
 
   and (@^|) m p : matrix = (* matrix exponentiation *)
     let rec matpow = function 
-      | p when p<0 -> raise (Logical_Error "in @^| : negative exponent")
+        p when p<0 -> raise (Logical_Error "in @^| : negative exponent")
       | p when p=0 -> ~|**|(~|m) (* identity matrix for exp 0 *)
       | p when p=1 -> m 
       | p -> (m @*@ (matpow (p - 1)))
@@ -362,34 +386,44 @@ end = struct
   (* gaussian elimination: transform a matrix to reduced row echelon form *)
   (* utilize full pivoting to ensure numerical stability *)
   (* ugly for loops but it's really the best way to deal with matrices, sorry ocaml *)
-  and (!@@) m : matrix = 
-    let rref mat = 
-      let a = ref (~|@ mat) in (* reference to the matrix being modified *)
+  and reduce rref m : matrix = 
+    let a = ref (~|@ m) in (* reference to the matrix being modified *)
 
-      let (n,m) = ~|| (!a) in (* rows, columns *)      
+    let (n,m) = ~|| (!a) in (* rows, columns *)      
 
-      for k = 0 to (min (n - 1) (m - 1)) do (
-        let maxrow = ref k in
-        for i=(k+1) to (n - 1) do ( (* find row of max el in this col to use as pivot *)
-          if (absol (!a).(i).(k))>(absol (!a).(!maxrow).(k)) then maxrow := i
-        ) done;
-        
-        (!a)@>.<|(k,!maxrow); (* swap this row with pivot row *)
-        
-        (* apply scale to all elements in pivot row (or fail if singular) *)
+    for k = 0 to (min (n - 1) (m - 1)) do (
+      let maxrow = ref k in
+      for i=(k+1) to (n - 1) do ( (* find row of max el in this col to use as pivot *)
+        if (absol (!a).(i).(k))>(absol (!a).(!maxrow).(k)) then maxrow := i
+      ) done;
+      
+      (!a)@>.<|(k,!maxrow); (* swap this row with pivot row *)
+      
+      (* apply scale to all elements in pivot row (or fail if singular) *)
+      if rref then begin
         if ((!a).(k).(k)) = zero then raise (Singular_Matrix "in !@@ (rref)")
         else a := Array.mapi (fun i r -> if i=k then (one &/ (r.(k)))|*^r else r) (!a);
+      end;
 
-        (* finally apply changes to all other rows *)
-        for i = 0 to (n - 1) do (
-          let mult = ((!a).(i).(k)) /. ((!a).(k).(k)) in
-          if i<>k then (
-            for j = k+1 to (m - 1) do 
-              (!a)@..(i,j,(!a).(i).(j) &- (mult&*((!a).(k).(j))))
-            done; (!a)@..(i,k,zero))
-        ) done;
-      ) done; !a 
-    in try rref m with
+      (* finally apply changes to all other rows *)
+      for i = (if rref then 0 else k+1) to (n - 1) do (
+        let mult = ((!a).(i).(k)) &/ ((!a).(k).(k)) in
+        if i<>k then (
+          for j = k+1 to (m - 1) do 
+            (!a)@..(i,j,(!a).(i).(j) &- (mult&*((!a).(k).(j))))
+          done; (!a)@..(i,k,zero))
+      ) done;
+    ) done; !a 
+
+  (* row echelon form *)
+  and (!@) m : matrix = 
+    try reduce false m with
+    | Singular_Matrix e -> ~@>m; raise (Singular_Matrix e)
+    | _ -> raise (Undefined_Error "in !@ (row echelon form)")
+
+  (* reduced row echelon form *)
+  and (!@@) m : matrix = 
+    try reduce true m with
     | Singular_Matrix e -> ~@>m; raise (Singular_Matrix e)
     | _ -> raise (Undefined_Error "in !@@ (rref)")
 

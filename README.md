@@ -1,6 +1,6 @@
 # An OCaml Matrix Library
 
-Purely symbolic matrix manipulation suite comprised of **51 operators** for matrix (OCaml `array`) creation, manipulation and calculation—mostly translations of Array library functions with some interesting additions. Will likely continue to grow as it's used.
+Purely symbolic matrix manipulation suite comprised of **52 operators** for matrix (OCaml `array`) creation, manipulation and calculation—mostly translations of Array library functions with some interesting additions. Will likely continue to grow as it's used.
 
 
 
@@ -24,7 +24,7 @@ In general, the leftmost character of an operator signals the associativity (pre
 
 It appears incomprehensible at first but you may find that there's some method to the madness.
 ``` ocaml
-module Matlib : sig
+module ACamlMatLib : sig
 
   type vector = float array         
   type matrix = vector array  
@@ -99,6 +99,13 @@ end
 
 #### Implementation
 
+ACamlMatLib features polymorphic computations by utilizing a functor requiring the `MatLibSettings` module be passed into the matrix library upon creation. 
+
+See `examples/element_types.ml` for details.
+<!-- 
+An example using:
+```ocaml
+
 The current form of ACamlMatLib uses native floats but can be easily changed by altering the block defining literals:
 ``` ocaml
   type vector = float array 
@@ -111,4 +118,4 @@ The current form of ACamlMatLib uses native floats but can be easily changed by 
   and ( &- ) a b = a-.b
   and ( &* ) a b = a*.b
   and ( &/ ) a b = a/.b
-```
+``` -->
