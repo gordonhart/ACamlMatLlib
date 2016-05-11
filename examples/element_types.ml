@@ -1,12 +1,12 @@
 
 (* 
 module FloatSets = struct 
-  type t = float
+  type elt = float
   let zero = 0. and one = 1. 
   and absol = fun x -> abs_float x
   and elprint = fun e -> sprintf "%0.3f\t" e
 
-  and t_eq a b = absol (e1&-e2)) < 1e-7
+  and t_eq a b = abs_float (a -. b) < 1e-7
 
   and t_add a b = a+.b
   and t_sub a b = a-.b
