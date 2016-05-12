@@ -1,6 +1,6 @@
 # An OCaml Matrix Library
 
-Purely symbolic matrix manipulation suite comprised of **52 operators** for matrix (OCaml `array`) creation, manipulation and calculation—mostly translations of Array library functions with some interesting additions. Will likely continue to grow as it's used.
+Purely symbolic matrix manipulation suite comprised of **51 operators** for matrix (OCaml `array`) creation, manipulation and calculation—mostly translations of Array library functions with some interesting additions. Will likely continue to grow as it's used.
 
 
 
@@ -95,6 +95,9 @@ module type ACamlMatLib = sig
 
 end
 ```
+The first 31 operators deal with creation and manipulation of matrices. The last 20 are arithmetic operators.
+
+Note that vectors are handled irrespective of orientation—there is no difference between a vector of size `[n x 1]` and one sized `[1 x n]`. In calculations it is assumed that a vector has the orientation required for the operation. As such, there is no transpose function for vectors.
 
 
 --
@@ -103,7 +106,7 @@ end
 
 ACamlMatLib allows for polymorphic computations by utilizing a functor requiring the `MatLibSettings` module be passed into the matrix library upon creation. 
 
-See `examples/element_types.ml` for details.
+See `setup.ml` for details.
 <!-- 
 An example using:
 ```ocaml

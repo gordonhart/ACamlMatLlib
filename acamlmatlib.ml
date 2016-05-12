@@ -31,7 +31,7 @@
 (* ======================================================================================== *)
 
 
-(* the settings module for use in ACamlMatLib functor -- *)
+(* the S module for use in ACamlMatLib functor -- *)
 (* define custom element type with custom operations *)
 module type MatlibSettings = sig
 
@@ -69,7 +69,6 @@ module type MatLib = sig
 
   val ( ~|   ) : 'a array -> int                          (* get length of v, or #rows of m *)
   val ( ~||  ) : matrix -> int * int                      (* get (r,c) size of matrix *)
-  val ( ~||? ) : matrix -> bool                           (* rectangular matrix test *)
   val ( ~|=|?) : matrix -> bool                           (* square matrix test *)
 
   val ( >~<  ) : 'a array -> 'b array -> ('a * 'b) array  (* zip arrays to tupled array *)
@@ -124,18 +123,22 @@ end
 
 
 (* by declaring "with type..." we are allowed to access the internal type elt from elsewhere *)
-module ACamlMatLib (Sts : MatlibSettings) : (MatLib with type elt = Sts.elt) = struct
+module ACamlMatLib (S : MatlibSettings) : (MatLib with type elt = S.elt) = struct
 
-  type elt = Sts.elt
+  type elt = S.elt
   type vector = elt array
   type matrix = vector array
 
-  let zero = Sts.zero and one = Sts.one and absol = Sts.absol
-  and ( &= ) = Sts.t_eq
-  and ( &+ ) = Sts.t_add
-  and ( &- ) = Sts.t_sub
-  and ( &* ) = Sts.t_mul
-  and ( &/ ) = Sts.t_div
+  let zero = S.zero and one = S.one 
+  and absol = S.absol
+  and elprint = S.elprint
+  and ( &= ) = S.t_eq
+  and ( &+ ) = S.t_add
+  and ( &- ) = S.t_sub
+  and ( &* ) = S.t_mul
+  and ( &/ ) = S.t_div
+
+  
 
   (* define exceptions *)
   exception Not_Square of string
@@ -145,20 +148,22 @@ module ACamlMatLib (Sts : MatlibSettings) : (MatLib with type elt = Sts.elt) = s
   exception Dimension_Mismatch of string
   exception Singular_Matrix of string
 
+
+
   (* MANIPULATION DEFINITIONS *)
   (* easy accessors to size *)
   let (~|) v : int = Array.length v
-  let (~||?) m : bool = (* test for rectangular matrix *)
-    Array.fold_left (fun acc r -> acc && ((~|r)=(~|(m.(0))))) true m
-  let (~||) m : int * int = if ~||? m then (~|m, ~|(m.(0))) 
+  let rectangular m : bool = Array.fold_left (fun acc r -> acc && ((~|r)=(~|(m.(0))))) true m
+  let (~||) m : int * int = if rectangular m then (~|m, ~|(m.(0))) 
     else raise (Logical_Error "in ~|| (matrix size: not a rectangular matrix")
   let (~|=|?) m : bool = let (r,c) = ~||m in r=c (* test if a matrix is square *)
+
 
   (* to make arrays less annoying to work with *)
   let (~|+) v : 'a array = Array.of_list v (* create array from list *)
   let (~|-) v : 'a list = Array.to_list v (* create list from array *)
   let (~|++) ll : matrix = let m = ~|+ (List.map (~|+) ll) in
-    if (~||? m) then m else raise (Logical_Error "in ~|++ : input not rectangular")
+    if rectangular m then m else raise (Logical_Error "in ~|++ : input not rectangular")
   let (~|--) m : elt list list = ~|- (Array.map (~|-) m)
 
   (* create FRESH copies of vectors/matrices *)
@@ -260,7 +265,7 @@ module ACamlMatLib (Sts : MatlibSettings) : (MatLib with type elt = Sts.elt) = s
   (* print a vector/matrix *)
   let (~^>) v : unit =
     let printvec vec = 
-      printf "[|\t"; Array.iter (fun el -> printf "%s" (Sts.elprint el)) vec; printf "|]\n"
+      printf "[|\t"; Array.iter (fun el -> printf "%s" (elprint el)) vec; printf "|]\n"
     in try printvec v with _ -> raise (Undefined_Error "couldn't print vector")
 
   let (~@>) m : unit = 
@@ -324,10 +329,7 @@ module ACamlMatLib (Sts : MatlibSettings) : (MatLib with type elt = Sts.elt) = s
     let scalemat scale mat = Array.map (fun v -> scale|*^v) mat in 
     try scalemat s m with _ -> raise (Undefined_Error "in |*@ (scale matrix)")
 
-
-
-  (* ting point : multiply [n x 1] vector by [n x 1] vector (or 1 x n) *) 
-  and (^*^) v1 v2 : elt = 
+  and (^*^) v1 v2 : elt = (* floating point : multiply [n x 1] vector by [n x 1] vector *) 
     let vxv r1 r2 = Array.fold_left (fun acc (e1,e2) -> (e1&*e2) &+ acc) zero (r1 >~< r2) in
     try vxv v1 v2 with _ -> raise (Dimension_Mismatch "in ^*^")
 
@@ -368,8 +370,6 @@ module ACamlMatLib (Sts : MatlibSettings) : (MatLib with type elt = Sts.elt) = s
     let mateq l r = Array.fold_left (fun acc (r1,r2) -> (r1^=^r2) && acc) true (l >~< r) in
     try mateq m1 m2 with _ -> raise (Dimension_Mismatch "in @=@")
 
-
-
   and (@^|) m p : matrix = (* matrix exponentiation *)
     let rec matpow = function 
         p when p<0 -> raise (Logical_Error "in @^| : negative exponent")
@@ -387,33 +387,33 @@ module ACamlMatLib (Sts : MatlibSettings) : (MatLib with type elt = Sts.elt) = s
   (* utilize full pivoting to ensure numerical stability *)
   (* ugly for loops but it's really the best way to deal with matrices, sorry ocaml *)
   and reduce rref m : matrix = 
-    let a = ref (~|@ m) in (* reference to the matrix being modified *)
+    let a = ~|@ m in
 
-    let (n,m) = ~|| (!a) in (* rows, columns *)      
+    let (n,m) = ~|| a in (* rows, columns *)      
 
     for k = 0 to (min (n - 1) (m - 1)) do (
       let maxrow = ref k in
       for i=(k+1) to (n - 1) do ( (* find row of max el in this col to use as pivot *)
-        if (absol (!a).(i).(k))>(absol (!a).(!maxrow).(k)) then maxrow := i
+        if (absol a.(i).(k))>(absol a.(!maxrow).(k)) then maxrow := i
       ) done;
       
-      (!a)@>.<|(k,!maxrow); (* swap this row with pivot row *)
+      a @>.<| (k,!maxrow); (* swap this row with pivot row *)
       
       (* apply scale to all elements in pivot row (or fail if singular) *)
-      if rref then begin
-        if ((!a).(k).(k)) = zero then raise (Singular_Matrix "in !@@ (rref)")
-        else a := Array.mapi (fun i r -> if i=k then (one &/ (r.(k)))|*^r else r) (!a);
-      end;
+      if rref then (
+        if (a.(k).(k)) = zero then raise (Singular_Matrix "in !@@ (rref)")
+        else a.(k) <- ((one &/ a.(k).(k)) |*^ a.(k)) (* scale row *)
+      );
 
       (* finally apply changes to all other rows *)
       for i = (if rref then 0 else k+1) to (n - 1) do (
-        let mult = ((!a).(i).(k)) &/ ((!a).(k).(k)) in
+        let mult = (a.(i).(k)) &/ (a.(k).(k)) in
         if i<>k then (
           for j = k+1 to (m - 1) do 
-            (!a)@..(i,j,(!a).(i).(j) &- (mult&*((!a).(k).(j))))
-          done; (!a)@..(i,k,zero))
+            a @.. (i,j, a.(i).(j) &- (mult &* (a.(k).(j))))
+          done; a @.. (i,k,zero))
       ) done;
-    ) done; !a 
+    ) done; a
 
   (* row echelon form *)
   and (!@) m : matrix = 

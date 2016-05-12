@@ -1,5 +1,5 @@
 
-(* 
+(* the default : for most applications, floats are desired *)
 module FloatSets = struct 
   type elt = float
   let zero = 0. and one = 1. 
@@ -13,9 +13,11 @@ module FloatSets = struct
   and t_mul a b = a*.b
   and t_div a b = a/.b
 end
- *)
 
-(* 
+
+
+(* not sure why this would ever be necessary (determinant is meaningless, etc)
+but here is is just in case 
 module IntSets = struct
   type elt = int
   let zero = 0 and one = 1 and absol = abs
@@ -29,8 +31,10 @@ end
  *)
 
 
+
+(* for a project working with images (matrices) comprised of grayscale pixel values *)
 (* black is treated as 1 (value 0), white 0 (value 255), and gray in between (values 1-254) *)
-type gray = White | Gray of int | Black
+(* type gray = White | Gray of int | Black
 
 module PixelSets = struct 
 
@@ -80,5 +84,5 @@ module PixelSets = struct
     | Gray g,Black -> Gray g
     | Gray g1,Gray g2 -> verify (Gray (iof (255.*.(((foi g1) /. 255.) /. ((foi g2) /. 255.)))))
 
-end
+end *)
 
