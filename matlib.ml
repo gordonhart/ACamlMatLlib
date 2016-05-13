@@ -8,7 +8,7 @@
 (*    Purely symbolic matrix manipulation suite.                                            *)
 (*      EVERYTHING is immutable unless explicitly stated otherwise!                         *)
 (*                                                                                          *)
-(*    There are 52 operators--should be comprehensible after reading                        *)
+(*    There are 50 operators--should be comprehensible after reading                        *)
 (*      through the signature for a few minutes.                                            *)
 (*                                                                                          *)
 (*    In general, the leftmost char of an operator signals the associativity/left           *)
@@ -30,27 +30,34 @@
 (*                                                                                          *)
 (* ======================================================================================== *)
 
+(* define exceptions *)
+exception Not_Square of string
+exception Out_of_Bounds of string
+exception Undefined_Error of string
+exception Logical_Error of string
+exception Dimension_Mismatch of string
+exception Singular_Matrix of string
 
-(* the S module for use in ACamlMatLib functor -- *)
+
+
+(* the settings module for use in ACamlMatLib functor -- *)
 (* define custom element type with custom operations *)
 module type MatlibSettings = sig
-
   type elt
   val zero : elt                    (* define element type elt for matrices *)
   val one : elt                     (* set zero,one as reference points *)
   val absol : elt -> elt            (* absolute value function for element type elt *)
-  val elprint : elt -> string       (* printout for type elt *)
+  val eltformat : elt -> string       (* string format printout for type elt *)
   val t_eq : elt -> elt -> bool     (* equality test for type elt *)
   val t_add : elt -> elt -> elt     (* element type aritmetic operations *)
   val t_sub : elt -> elt -> elt
   val t_mul : elt -> elt -> elt
   val t_div : elt -> elt -> elt
-
 end
 
 
 
-module type MatLib = sig
+module type Matlib = sig
 
   type elt
   type vector = elt array
@@ -70,8 +77,6 @@ module type MatLib = sig
   val ( ~|   ) : 'a array -> int                          (* get length of v, or #rows of m *)
   val ( ~||  ) : matrix -> int * int                      (* get (r,c) size of matrix *)
   val ( ~|=|?) : matrix -> bool                           (* square matrix test *)
-
-  val ( >~<  ) : 'a array -> 'b array -> ('a * 'b) array  (* zip arrays to tupled array *)
 
   val ( ^..  ) : vector -> int * elt -> unit              (* mutable: modify index in vector *)
   val ( ^... ) : vector -> (int * elt) list -> unit       (* mutable: modify many vector els *)
@@ -123,7 +128,7 @@ end
 
 
 (* by declaring "with type..." we are allowed to access the internal type elt from elsewhere *)
-module ACamlMatLib (S : MatlibSettings) : (MatLib with type elt = S.elt) = struct
+module Make (S : MatlibSettings) : (Matlib with type elt = S.elt) = struct
 
   type elt = S.elt
   type vector = elt array
@@ -131,22 +136,12 @@ module ACamlMatLib (S : MatlibSettings) : (MatLib with type elt = S.elt) = struc
 
   let zero = S.zero and one = S.one 
   and absol = S.absol
-  and elprint = S.elprint
+  and eltformat = S.eltformat
   and ( &= ) = S.t_eq
   and ( &+ ) = S.t_add
   and ( &- ) = S.t_sub
   and ( &* ) = S.t_mul
   and ( &/ ) = S.t_div
-
-  
-
-  (* define exceptions *)
-  exception Not_Square of string
-  exception Out_of_Bounds of string
-  exception Undefined_Error of string
-  exception Logical_Error of string
-  exception Dimension_Mismatch of string
-  exception Singular_Matrix of string
 
 
 
@@ -157,7 +152,6 @@ module ACamlMatLib (S : MatlibSettings) : (MatLib with type elt = S.elt) = struc
   let (~||) m : int * int = if rectangular m then (~|m, ~|(m.(0))) 
     else raise (Logical_Error "in ~|| (matrix size: not a rectangular matrix")
   let (~|=|?) m : bool = let (r,c) = ~||m in r=c (* test if a matrix is square *)
-
 
   (* to make arrays less annoying to work with *)
   let (~|+) v : 'a array = Array.of_list v (* create array from list *)
@@ -188,9 +182,8 @@ module ACamlMatLib (S : MatlibSettings) : (MatLib with type elt = S.elt) = struc
     let remove_index ind vec = 
       let inc = ref (-1) in let inc_is loc = inc := !inc + 1; !inc = loc in
       Array.fold_left (fun a x -> if inc_is ind then a else Array.append a [|x|]) [||] vec
-    in try if (i < (~| v)) then remove_index i v else raise (Out_of_Bounds "in |-^") with
-    | Out_of_Bounds e -> printf "i: %d\n||v||: %d\n" i (~|v); raise (Out_of_Bounds e)
-    | _ -> raise (Undefined_Error "in |-^ : couldn't remove index from vector")
+    in try assert (i < (~| v)); remove_index i v
+    with _ -> raise (Out_of_Bounds "in |-^ : couldn't remove index %d from vector")
 
   (* cut off n elements from the front of vector *)
   let (^--|) v n : 'a array = (* a|-|1 is effectively a call to the tail of the vector *)
@@ -265,7 +258,9 @@ module ACamlMatLib (S : MatlibSettings) : (MatLib with type elt = S.elt) = struc
   (* print a vector/matrix *)
   let (~^>) v : unit =
     let printvec vec = 
-      printf "[|\t"; Array.iter (fun el -> printf "%s" (elprint el)) vec; printf "|]\n"
+      print_string "[|\t"; 
+      Array.iter (fun el -> print_string (eltformat el)) vec; 
+      print_endline "|]"
     in try printvec v with _ -> raise (Undefined_Error "couldn't print vector")
 
   let (~@>) m : unit = 
@@ -275,7 +270,7 @@ module ACamlMatLib (S : MatlibSettings) : (MatLib with type elt = S.elt) = struc
 
   (* CALCULATION DEFINITIONS *)
   (* defined entirely mutually recursively to avoid headaches of ordering *)
-  let rec matlib () = printf "Matrix calculation operations ensue...\n"
+  let rec matlib () = print_endline "Matrix calculation operations ensue..."
 
   (* return the transpose of a matrix *)
   and (!~) m : matrix = 
@@ -376,10 +371,7 @@ module ACamlMatLib (S : MatlibSettings) : (MatLib with type elt = S.elt) = struc
       | p when p=0 -> ~|**|(~|m) (* identity matrix for exp 0 *)
       | p when p=1 -> m 
       | p -> (m @*@ (matpow (p - 1)))
-    in try (if ~|=|? m then matpow p else raise (Not_Square "in @^| (exponent)")) with 
-    | Not_Square msg -> ~@>m; raise (Not_Square msg)
-    | Logical_Error e -> printf "Exponent: %d\n" p; raise (Logical_Error e)
-    | _ -> raise (Undefined_Error "in @^| (matrix exponent)")
+    in if ~|=|? m then matpow p else raise (Not_Square "in @^| (exponent)")
 
 
 

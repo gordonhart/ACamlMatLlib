@@ -1,6 +1,17 @@
 
-#use "acamlmatlib.ml";;
-open ACamlMatLib;;
+#use "matlib.ml";;
+module ML = Make(struct 
+  type elt = float
+  let zero = 0. and one = 1. 
+  and absol = fun x -> abs_float x
+  and eltformat = fun e -> sprintf "%0.3f\t" e
+  and t_eq a b = abs_float (a -. b) < 1e-7
+  and t_add a b = a+.b
+  and t_sub a b = a-.b
+  and t_mul a b = a*.b
+  and t_div a b = a/.b
+end);;
+open ML;;
 
 (* maybe I'll include this sometime later *)
 (* #use "testers/fileio.ml";; *)
@@ -81,8 +92,8 @@ let lsq_params = least_squares basisfuns xp yp;;
 
 
 (* make a function out of the parameters obtained from the lease squares fit *)
-let lsq_function = 
-	basisfx (~|- (Array.map (fun (p,f) -> fun x -> p*.(f x)) (lsq_params >~< (~|+ basisfuns))));;
+let lsq_function = basisfx 
+	(List.map (fun (p,f) -> fun x -> p*.(f x)) (List.combine (~|- lsq_params) basisfuns));;
 
 let lsq_func_points = fx_over_time lsq_function xrange 0.05;;
 let example_points = fx_over_time example_curve xrange 0.05;;

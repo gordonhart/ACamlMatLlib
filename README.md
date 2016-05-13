@@ -1,6 +1,6 @@
 # An OCaml Matrix Library
 
-Purely symbolic matrix manipulation suite comprised of **51 operators** for matrix (OCaml `array`) creation, manipulation and calculation—mostly translations of Array library functions with some interesting additions. Will likely continue to grow as it's used.
+Purely symbolic matrix manipulation suite comprised of **50 operators** for matrix (OCaml `array`) creation, manipulation and calculation—mostly translations of Array library functions with some interesting additions. Will likely continue to grow as it's used.
 
 
 
@@ -24,7 +24,7 @@ In general, the leftmost character of an operator signals the associativity (pre
 
 It appears incomprehensible at first but you may find that there's some method to the madness.
 ``` ocaml
-module type ACamlMatLib = sig
+module type Matlib = sig
 
   type elt
   type vector = elt array
@@ -43,10 +43,7 @@ module type ACamlMatLib = sig
 
   val ( ~|   ) : 'a array -> int                          (* get length of v, or #rows of m *)
   val ( ~||  ) : matrix -> int * int                      (* get (r,c) size of matrix *)
-  val ( ~||? ) : matrix -> bool                           (* rectangular matrix test *)
   val ( ~|=|?) : matrix -> bool                           (* square matrix test *)
-
-  val ( >~<  ) : 'a array -> 'b array -> ('a * 'b) array  (* zip arrays to tupled array *)
 
   val ( ^..  ) : vector -> int * elt -> unit              (* mutable: modify index in vector *)
   val ( ^... ) : vector -> (int * elt) list -> unit       (* mutable: modify many vector els *)
@@ -95,7 +92,7 @@ module type ACamlMatLib = sig
 
 end
 ```
-The first 31 operators deal with creation and manipulation of matrices. The last 20 are arithmetic operators.
+The first 30 operators deal with creation and manipulation of matrices. The last 20 are arithmetic operators.
 
 Note that vectors are handled irrespective of orientation—there is no difference between a vector of size `[n x 1]` and one sized `[1 x n]`. In calculations it is assumed that a vector has the orientation required for the operation. As such, there is no transpose function for vectors.
 
